@@ -180,10 +180,11 @@ export const mockClient = {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
     const slot = typeof payload?.slot === 'string' ? payload.slot : null
+    const selected = typeof payload?.student_id === 'string' ? payload.student_id : null
     return {
       session_id: `cls-${code}`,
       state: action === 'pause' ? ('paused' as const) : ('active' as const),
-      current_student: students[0]?.id ?? null,
+      current_student: selected ?? students[0]?.id ?? null,
       current_slot: slot,
       turn_count: 1,
       updated_at: new Date().toISOString(),
@@ -317,6 +318,26 @@ export const mockClient = {
     }))
   },
 
+  async addLessonTrace(lessonId: string, content: string) {
+    await delay(200)
+    const course = courseRecords.find((c) => c.id === lessonId)
+    if (!course) {
+      throw new ApiClientError('课程不存在', 404, 'LESSON_NOT_FOUND')
+    }
+    course.traces = [...course.traces, content]
+    return {
+      lesson_id: course.id,
+      topic: course.title,
+      date: course.date,
+      duration: course.duration,
+      joined: course.joined,
+      avg_score: null,
+      status: course.status === '已完成' ? ('done' as const) : ('active' as const),
+      goal: course.goal,
+      traces: course.traces,
+    }
+  },
+
   async getAcademicSummary(code: string) {
     await delay(200)
     if (code !== 'LTZ2024') {
@@ -330,6 +351,7 @@ export const mockClient = {
         name: s.name,
         role: r.role,
         scores: r.scores,
+        background: r.background,
         teacher_note: r.note,
         updated_at: new Date().toISOString(),
       }
@@ -343,7 +365,7 @@ export const mockClient = {
     }
   },
 
-  async importAcademicJson(code: string, records: { student_no: string; scores: { subject: string; score: number }[]; role: string; teacher_note?: string }[]) {
+  async importAcademicJson(code: string, records: { student_no: string; scores: { subject: string; score: number }[]; role: string; background?: string; teacher_note?: string }[]) {
     await delay(300)
     if (code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
@@ -356,6 +378,7 @@ export const mockClient = {
         name: s.name,
         role: r.role as 'member' | 'group_leader' | 'class_committee' | 'subject_rep',
         scores: r.scores.map((sc) => ({ ...sc, trend: 'flat' as const })),
+        background: r.background || '',
         teacher_note: r.teacher_note || '',
         updated_at: new Date().toISOString(),
       }
@@ -368,6 +391,27 @@ export const mockClient = {
         attention_count: 0,
       },
     }
+  },
+
+  async manualAddAcademic(code: string, entry: { name: string; student_no?: string; scores: { subject: string; score: number }[]; role: string; background?: string; teacher_note?: string }) {
+    await delay(300)
+    if (code !== 'LTZ2024') {
+      throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    const existing = academicRows.find((r) => {
+      const s = students.find((x) => x.id === r.id)!
+      return s.name === entry.name
+    })
+    if (!existing) {
+      academicRows.push({
+        id: `stu-${Date.now().toString(36)}`,
+        scores: entry.scores.map((sc) => ({ ...sc, trend: 'flat' as const })),
+        role: entry.role as 'member' | 'group_leader' | 'class_committee' | 'subject_rep',
+        background: entry.background || '',
+        note: entry.teacher_note || '',
+      })
+    }
+    return this.getAcademicSummary(code)
   },
 
   async importAcademicFile(code: string, _file: File) {

@@ -9,9 +9,9 @@ from pydantic import BaseModel, Field
 class ControlReq(BaseModel):
     """R12：课堂控制指令（A9 新增 client_cmd_id 去重）。"""
 
-    action: Literal["pause", "resume", "next_student", "switch_content"] = Field(
-        ..., description="控制动作"
-    )
+    action: Literal[
+        "pause", "resume", "next_student", "switch_content", "select_student"
+    ] = Field(..., description="控制动作")
     payload: dict[str, Any] | None = Field(default=None, description="动作附加数据")
     client_cmd_id: str = Field(..., description="客户端命令 ID，用于去重")
 

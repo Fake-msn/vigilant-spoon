@@ -82,6 +82,20 @@ class AcademicRecordInput(BaseModel):
     role: Literal["member", "group_leader", "class_committee", "subject_rep"] = Field(
         ..., description="校内角色"
     )
+    background: str = Field(default="", description="背景信息（AI 对话上下文）")
+    teacher_note: str = Field(default="", description="教师评语")
+
+
+class ManualAcademicEntry(BaseModel):
+    """教师手动录入学情档案（支持在册或新增学生）。"""
+
+    name: str = Field(..., min_length=1, max_length=50, description="姓名")
+    student_no: str | None = Field(default=None, description="学号（可空，缺省自动生成）")
+    scores: list[SubjectScore] = Field(..., description="各科成绩")
+    role: Literal["member", "group_leader", "class_committee", "subject_rep"] = Field(
+        ..., description="校内角色"
+    )
+    background: str = Field(default="", description="背景信息")
     teacher_note: str = Field(default="", description="教师评语")
 
 
@@ -95,6 +109,7 @@ class AcademicRecord(BaseModel):
         ..., description="校内角色"
     )
     scores: list[SubjectScore] = Field(..., description="各科成绩")
+    background: str = Field(..., description="背景信息（AI 对话上下文）")
     teacher_note: str = Field(..., description="教师评语")
     updated_at: datetime = Field(..., description="更新时间")
 

@@ -21,6 +21,8 @@ export function TeacherCoursesPage() {
   const [courses, setCourses] = useState<CourseRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [traceDrafts, setTraceDrafts] = useState<Record<string, string>>({})
+  const [savingTrace, setSavingTrace] = useState<string | null>(null)
 
   useEffect(() => {
     if (!classCode) return
@@ -34,6 +36,22 @@ export function TeacherCoursesPage() {
       .catch((err) => setError(err instanceof Error ? err.message : '加载失败'))
       .finally(() => setLoading(false))
   }, [classCode])
+
+  const addTrace = async (lessonId: string) => {
+    const content = traceDrafts[lessonId]?.trim()
+    if (!content) return
+    setSavingTrace(lessonId)
+    setError(null)
+    try {
+      const updated = await api.addLessonTrace(lessonId, content)
+      setCourses((prev) => prev.map((c) => (c.lesson_id === lessonId ? { ...c, traces: updated.traces } : c)))
+      setTraceDrafts((prev) => ({ ...prev, [lessonId]: '' }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存留痕失败')
+    } finally {
+      setSavingTrace(null)
+    }
+  }
 
   const doneCount = courses.filter((c) => c.status === 'done').length
   const totalJoined = courses.reduce((s, c) => s + c.joined, 0)
@@ -159,6 +177,25 @@ export function TeacherCoursesPage() {
                     </li>
                   ))}
                 </ul>
+                <div className="mt-3 flex gap-2">
+                  <input
+                    value={traceDrafts[c.lesson_id] ?? ''}
+                    onChange={(e) => setTraceDrafts((prev) => ({ ...prev, [c.lesson_id]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') addTrace(c.lesson_id)
+                    }}
+                    placeholder="添加一条留痕评语…"
+                    className="input-soft flex-1 !py-2 text-xs"
+                  />
+                  <button
+                    onClick={() => addTrace(c.lesson_id)}
+                    disabled={savingTrace === c.lesson_id || !(traceDrafts[c.lesson_id] ?? '').trim()}
+                    className="btn-line !px-3.5 !py-2 text-xs"
+                  >
+                    <Icon name={savingTrace === c.lesson_id ? 'loader' : 'plus'} size={13} className={savingTrace === c.lesson_id ? 'animate-spin' : ''} />
+                    留痕
+                  </button>
+                </div>
               </div>
             </div>
           </article>

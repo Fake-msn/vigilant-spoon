@@ -189,6 +189,18 @@ def control_session(
             students = _get_class_students(conn, class_code)
             current_student = _next_student(students, current_student)
             turn_count += 1
+        elif req.action == "select_student":
+            if state != "active":
+                raise _illegal_state("只能在上课中手动选择学生")
+            target = (req.payload or {}).get("student_id")
+            if not isinstance(target, str) or not target:
+                raise _illegal_state("缺少要选择的学生 ID")
+            students = _get_class_students(conn, class_code)
+            ids = [str(s["student_id"]) for s in students]
+            if target not in ids:
+                raise _illegal_state("目标学生不在当前班级")
+            current_student = target
+            turn_count += 1
         elif req.action == "switch_content":
             if state != "active":
                 raise _illegal_state("只能在上课中切换内容")

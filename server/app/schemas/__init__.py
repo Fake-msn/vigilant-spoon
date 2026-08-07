@@ -13,12 +13,19 @@ from app.schemas.growth import (
     Commitment,
     EvidenceItem,
     GrowthView,
+    ManualAcademicEntry,
     PetState,
     ScoreCard,
     SubjectScore,
 )
 from app.schemas.job import JobError, JobRef, JobStatus
-from app.schemas.lesson import LessonGenReq, LessonMaterial, LessonPlan, LessonSummary
+from app.schemas.lesson import (
+    LessonGenReq,
+    LessonMaterial,
+    LessonPlan,
+    LessonSummary,
+    TraceCreate,
+)
 from app.schemas.letter import Letter
 from app.schemas.session import (
     ClassCreateReq,
@@ -76,6 +83,7 @@ __all__ = [
     "LessonPlan",
     "LessonSummary",
     "Letter",
+    "ManualAcademicEntry",
     "PetState",
     "ScoreCard",
     "ServiceConfig",
@@ -86,6 +94,7 @@ __all__ = [
     "TeacherEnterReq",
     "TeacherEnterResp",
     "TeacherProfile",
+    "TraceCreate",
     "TeacherClassesResp",
     "TeacherClassView",
     "TeacherSwitchReq",

@@ -44,3 +44,9 @@ class LessonSummary(BaseModel):
     status: Literal["active", "done"] = Field(..., description="课程状态")
     goal: str = Field(..., description="教学目标")
     traces: list[str] = Field(..., description="课堂痕迹")
+
+
+class TraceCreate(BaseModel):
+    """教师为课程追加一条留痕评语。"""
+
+    content: str = Field(..., min_length=1, max_length=500, description="留痕内容")

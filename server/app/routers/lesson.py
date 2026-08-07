@@ -12,7 +12,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.db import get_db_connection
 from app.deps import CurrentUser, get_current_user
-from app.schemas import LessonGenReq, LessonMaterial, LessonPlan, LessonSummary
+from app.schemas import (
+    LessonGenReq,
+    LessonMaterial,
+    LessonPlan,
+    LessonSummary,
+    TraceCreate,
+)
 from app.schemas.common import ErrorEnvelope
 from app.services.llm import chat_completion
 
@@ -235,5 +241,39 @@ def list_lessons(
             (class_code,),
         ).fetchall()
         return [_build_summary(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@router.post("/lessons/{lesson_id}/traces", response_model=LessonSummary)
+def add_lesson_trace(
+    lesson_id: str,
+    req: TraceCreate,
+    user: CurrentUser = Depends(get_current_user),
+) -> LessonSummary:
+    """教师为课程追加一条课堂留痕评语，供日后回顾。"""
+    conn = get_db_connection()
+    try:
+        row = conn.execute(
+            "SELECT * FROM courses WHERE course_id = ?", (lesson_id,)
+        ).fetchone()
+        if row is None or row["class_code"] != user.class_code:
+            raise _lesson_not_found(lesson_id)
+
+        traces = _parse_json(row["traces"])
+        if not isinstance(traces, list):
+            traces = []
+        traces.append(req.content.strip())
+
+        conn.execute(
+            "UPDATE courses SET traces = ? WHERE course_id = ?",
+            (json.dumps(traces, ensure_ascii=False), lesson_id),
+        )
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT * FROM courses WHERE course_id = ?", (lesson_id,)
+        ).fetchone()
+        return _build_summary(row)
     finally:
         conn.close()

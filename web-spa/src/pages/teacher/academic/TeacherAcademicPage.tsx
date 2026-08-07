@@ -18,6 +18,8 @@ const roleStyle: Record<string, string> = {
   subject_rep: 'bg-grape-soft text-grape',
 }
 
+const SUBJECTS = ['语文', '数学', '英语'] as const
+
 function Trend({ t }: { t: 'up' | 'down' | 'flat' }) {
   if (t === 'up') return <span className="text-mint" title="上升">▲</span>
   if (t === 'down') return <span className="text-red-500" title="下滑">▼</span>
@@ -30,7 +32,37 @@ type AcademicRecord = {
   name: string
   role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
   scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
+  background: string
   teacher_note: string
+}
+
+type Role = AcademicRecord['role']
+
+type FormState = {
+  name: string
+  student_no: string
+  scores: Record<string, string>
+  role: Role
+  background: string
+  teacher_note: string
+}
+
+const emptyForm = (): FormState => ({
+  name: '',
+  student_no: '',
+  scores: { 语文: '', 数学: '', 英语: '' },
+  role: 'member',
+  background: '',
+  teacher_note: '',
+})
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[13px] font-semibold text-ink">{label}</span>
+      {children}
+    </label>
+  )
 }
 
 export function TeacherAcademicPage() {
@@ -43,25 +75,21 @@ export function TeacherAcademicPage() {
   const [importing, setImporting] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const [roles, setRoles] = useState<Record<string, string>>({})
-  const [comments, setComments] = useState<Record<string, string>>({})
-
-  console.log('[academic] render loading=', loading, 'records=', records.length)
+  // 手动录入 / 快捷修改 模态框
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState<FormState>(emptyForm)
+  const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
-    console.log('[academic] load start classCode=', classCode)
     if (!classCode) return
     setLoading(true)
     setError(null)
     try {
       const data = await api.getAcademicSummary(classCode)
-      console.log('[academic] data', data)
       setRecords(data.records)
       setSummary(data.summary)
-      setRoles(Object.fromEntries(data.records.map((r) => [r.student_id, r.role])))
-      setComments(Object.fromEntries(data.records.map((r) => [r.student_id, r.teacher_note])))
     } catch (err) {
-      console.log('[academic] error', err)
       setError(err instanceof Error ? err.message : '加载失败')
     } finally {
       setLoading(false)
@@ -105,6 +133,65 @@ export function TeacherAcademicPage() {
     }
   }
 
+  const openAdd = () => {
+    setEditingId(null)
+    setForm(emptyForm())
+    setError(null)
+    setModalOpen(true)
+  }
+
+  const openEdit = (r: AcademicRecord) => {
+    setEditingId(r.student_id)
+    setForm({
+      name: r.name,
+      student_no: r.student_no,
+      scores: {
+        语文: r.scores.find((s) => s.subject === '语文')?.score?.toString() ?? '',
+        数学: r.scores.find((s) => s.subject === '数学')?.score?.toString() ?? '',
+        英语: r.scores.find((s) => s.subject === '英语')?.score?.toString() ?? '',
+      },
+      role: r.role,
+      background: r.background,
+      teacher_note: r.teacher_note,
+    })
+    setError(null)
+    setModalOpen(true)
+  }
+
+  const submitForm = async () => {
+    const name = form.name.trim()
+    if (!name) {
+      setError('请填写学生姓名')
+      return
+    }
+    if (!classCode || !modalOpen) return
+    const scores = SUBJECTS.filter((s) => form.scores[s] !== '')
+      .map((s) => ({ subject: s, score: Number(form.scores[s]) }))
+      .filter((s) => Number.isFinite(s.score))
+    if (scores.some((s) => s.score < 0 || s.score > 100)) {
+      setError('成绩需在 0-100 之间')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      await api.manualAddAcademic(classCode, {
+        name,
+        student_no: form.student_no.trim() || undefined,
+        scores,
+        role: form.role,
+        background: form.background.trim(),
+        teacher_note: form.teacher_note.trim(),
+      })
+      setModalOpen(false)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center text-ink-soft">
@@ -139,7 +226,7 @@ export function TeacherAcademicPage() {
             <Icon name="upload" size={14} />
             {importing ? '导入中…' : '文件导入'}
           </button>
-          <button className="btn-brand !px-4 !py-2 text-xs">
+          <button onClick={openAdd} className="btn-brand !px-4 !py-2 text-xs">
             <Icon name="plus" size={14} />
             手动录入
           </button>
@@ -172,7 +259,7 @@ export function TeacherAcademicPage() {
 
       <div className="card mt-6 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table className="w-full min-w-[820px] text-left text-sm">
             <thead>
               <tr className="border-b border-line bg-brand-faint text-xs font-bold text-ink-soft">
                 <th className="px-5 py-3.5">学生</th>
@@ -182,6 +269,7 @@ export function TeacherAcademicPage() {
                 <th className="px-4 py-3.5">校内角色</th>
                 <th className="px-5 py-3.5">背景信息（AI 对话上下文）</th>
                 <th className="px-5 py-3.5">教师评语</th>
+                <th className="px-4 py-3.5" />
               </tr>
             </thead>
             <tbody>
@@ -202,7 +290,7 @@ export function TeacherAcademicPage() {
                         </span>
                       </span>
                     </td>
-                    {['语文', '数学', '英语'].map((subject) => {
+                    {SUBJECTS.map((subject) => {
                       const sc = scoreMap[subject]
                       return (
                         <td key={subject} className="px-4 py-3.5">
@@ -218,28 +306,22 @@ export function TeacherAcademicPage() {
                       )
                     })}
                     <td className="px-4 py-3.5">
-                      <select
-                        value={roles[r.student_id] ?? r.role}
-                        onChange={(e) => setRoles((prev) => ({ ...prev, [r.student_id]: e.target.value }))}
-                        className={`tag !text-[11px] ${roleStyle[roles[r.student_id] ?? r.role]} cursor-pointer border-0`}
-                      >
-                        {roleOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
+                      <span className={`tag !text-[11px] ${roleStyle[r.role]}`}>{roleOptions.find((o) => o.value === r.role)?.label ?? r.role}</span>
                     </td>
-                    <td className="max-w-[260px] px-5 py-3.5 text-[13px] leading-6 text-ink-soft">
+                    <td className="max-w-[240px] px-5 py-3.5 text-[13px] leading-6 text-ink-soft">
+                      {r.background || '-'}
+                    </td>
+                    <td className="max-w-[200px] px-5 py-3.5 text-[13px] leading-6 text-ink-soft">
                       {r.teacher_note || '-'}
                     </td>
-                    <td className="px-5 py-3.5">
-                      <input
-                        value={comments[r.student_id] ?? ''}
-                        onChange={(e) => setComments((prev) => ({ ...prev, [r.student_id]: e.target.value }))}
-                        placeholder="添加评语…"
-                        className="input-soft !py-2 text-xs"
-                      />
+                    <td className="px-4 py-3.5">
+                      <button
+                        onClick={() => openEdit(r)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-ink-soft transition-colors hover:border-brand/40 hover:text-brand"
+                      >
+                        <Icon name="edit" size={13} />
+                        修改
+                      </button>
                     </td>
                   </tr>
                 )
@@ -252,6 +334,128 @@ export function TeacherAcademicPage() {
           示例：王小雅想当蛋糕师而数学在下滑，AI 会自然聊到「做蛋糕要算配料，数学可不能落下哦」。
         </div>
       </div>
+
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !saving && setModalOpen(false)}>
+          <div
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black text-ink">{editingId ? '快捷修改学情' : '手动录入学情'}</h2>
+                <p className="mt-0.5 text-xs text-ink-faint">
+                  {editingId ? '修改后将对这名学生生效' : '支持录入在册学生或新增学生'}
+                </p>
+              </div>
+              <button
+                onClick={() => setModalOpen(false)}
+                disabled={saving}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-faint transition-colors hover:bg-brand-faint hover:text-ink"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="姓名">
+                  <input
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="学生姓名"
+                    className="input-soft"
+                  />
+                </Field>
+                <Field label="学号（可选）">
+                  <input
+                    value={form.student_no}
+                    onChange={(e) => setForm((f) => ({ ...f, student_no: e.target.value }))}
+                    placeholder="留空自动生成"
+                    className="input-soft"
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {SUBJECTS.map((subject) => (
+                  <Field key={subject} label={`${subject}成绩`}>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={form.scores[subject]}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, scores: { ...f.scores, [subject]: e.target.value } }))
+                      }
+                      placeholder="0-100"
+                      className="input-soft"
+                    />
+                  </Field>
+                ))}
+              </div>
+
+              <Field label="校内角色">
+                <select
+                  value={form.role}
+                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as Role }))}
+                  className="input-soft cursor-pointer"
+                >
+                  {roleOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="背景信息（AI 对话上下文）">
+                <textarea
+                  value={form.background}
+                  onChange={(e) => setForm((f) => ({ ...f, background: e.target.value }))}
+                  placeholder="家庭、性格、兴趣等背景，供 AI 在对话中自然引用"
+                  rows={3}
+                  className="input-soft resize-none"
+                />
+              </Field>
+
+              <Field label="教师评语">
+                <textarea
+                  value={form.teacher_note}
+                  onChange={(e) => setForm((f) => ({ ...f, teacher_note: e.target.value }))}
+                  placeholder="你对这名学生的观察与建议"
+                  rows={2}
+                  className="input-soft resize-none"
+                />
+              </Field>
+            </div>
+
+            {error && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-600">
+                {error}
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-2.5">
+              <button
+                onClick={() => setModalOpen(false)}
+                disabled={saving}
+                className="btn-line !px-5 !py-2.5 text-sm"
+              >
+                取消
+              </button>
+              <button
+                onClick={submitForm}
+                disabled={saving || !form.name.trim()}
+                className="btn-brand !px-5 !py-2.5 text-sm"
+              >
+                <Icon name={saving ? 'loader' : 'check'} size={14} className={saving ? 'animate-spin' : ''} />
+                {saving ? '保存中…' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

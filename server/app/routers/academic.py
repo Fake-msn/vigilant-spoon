@@ -13,7 +13,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, stat
 
 from app.db import get_db_connection
 from app.deps import CurrentUser, get_current_user
-from app.schemas import AcademicRecord, AcademicRecordInput, AcademicSummary, SubjectScore
+from app.schemas import (
+    AcademicRecord,
+    AcademicRecordInput,
+    AcademicSummary,
+    ManualAcademicEntry,
+    SubjectScore,
+)
 from app.schemas.common import ErrorEnvelope
 
 router = APIRouter(prefix="/classes", tags=["academic"])
@@ -102,18 +108,21 @@ def _insert_record(
     student_id: str,
     scores: list[SubjectScore],
     role: str,
+    background: str,
     teacher_note: str,
 ) -> None:
     now = _now().isoformat()
     conn.execute(
         """
-        INSERT INTO academic_records (student_id, scores, role, teacher_note, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO academic_records
+            (student_id, scores, role, background, teacher_note, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
         (
             student_id,
             json.dumps([s.model_dump() for s in scores], ensure_ascii=False),
             role,
+            background,
             teacher_note,
             now,
         ),
@@ -252,7 +261,14 @@ def _upsert_records(
 
     for rec in records:
         info = students[rec.student_no]
-        _insert_record(conn, info[0], rec.scores, rec.role, rec.teacher_note)
+        _insert_record(
+            conn,
+            info[0],
+            rec.scores,
+            rec.role,
+            rec.background,
+            rec.teacher_note,
+        )
     conn.commit()
 
     return _build_summary(conn, class_code)
@@ -341,6 +357,7 @@ def _build_record(conn: sqlite3.Connection, row: sqlite3.Row) -> AcademicRecord:
         name=row["name"],
         role=row["role"],
         scores=scores,
+        background=row["background"] or "",
         teacher_note=row["teacher_note"],
         updated_at=datetime.fromisoformat(updated_at) if updated_at else _now(),
     )
@@ -428,6 +445,85 @@ def get_academic_summary(
         ).fetchone()
         if cls is None:
             raise _class_not_found(class_code)
+        return _build_summary(conn, class_code)
+    finally:
+        conn.close()
+
+
+@router.post("/{class_code}/academic/manual", response_model=AcademicSummary)
+def manual_add_academic(
+    class_code: str,
+    entry: ManualAcademicEntry,
+    user: CurrentUser = Depends(get_current_user),
+) -> AcademicSummary:
+    """教师手动录入学情档案：支持命中在册学生或按姓名新增学生。"""
+    if user.class_code != class_code:
+        raise _class_not_found(class_code)
+
+    if any(sc.score < 0 or sc.score > 100 for sc in entry.scores):
+        raise _validation_error("成绩需在 0-100 之间")
+
+    conn = get_db_connection()
+    try:
+        cls = conn.execute(
+            "SELECT grade FROM classes WHERE class_code = ?", (class_code,)
+        ).fetchone()
+        if cls is None:
+            raise _class_not_found(class_code)
+
+        # 优先按姓名匹配在册学生；其次按学号匹配；否则新增学生
+        row = conn.execute(
+            "SELECT student_id FROM students "
+            "WHERE class_code = ? AND name = ? ORDER BY student_no LIMIT 1",
+            (class_code, entry.name),
+        ).fetchone()
+        student_id: str
+        if row is not None:
+            student_id = row["student_id"]
+        else:
+            student_no = entry.student_no
+            if student_no:
+                existing = conn.execute(
+                    "SELECT student_id FROM students WHERE student_no = ?",
+                    (student_no,),
+                ).fetchone()
+                if existing is not None:
+                    raise _validation_error(
+                        "学号已被其他学生占用", {"student_no": student_no}
+                    )
+            else:
+                count = conn.execute(
+                    "SELECT COUNT(*) AS n FROM students WHERE class_code = ?",
+                    (class_code,),
+                ).fetchone()["n"]
+                student_no = f"{class_code}-{int(count) + 1:02d}"
+
+            student_id = f"{class_code}-{entry.name}"
+            conn.execute(
+                "INSERT INTO students "
+                "(student_id, class_code, name, grade, student_no, ideal, avatar_seed, role) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    student_id,
+                    class_code,
+                    entry.name,
+                    cls["grade"],
+                    student_no,
+                    None,
+                    hash(entry.name) % 16,
+                    "member",
+                ),
+            )
+
+        _insert_record(
+            conn,
+            student_id,
+            entry.scores,
+            entry.role,
+            entry.background,
+            entry.teacher_note,
+        )
+        conn.commit()
         return _build_summary(conn, class_code)
     finally:
         conn.close()

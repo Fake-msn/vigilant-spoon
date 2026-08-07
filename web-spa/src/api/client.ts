@@ -230,6 +230,20 @@ export const realClient = {
     goal: string
     traces: string[]
   }[]>(`/classes/${encodeURIComponent(code)}/lessons`),
+  addLessonTrace: (lessonId: string, content: string) => request<{
+    lesson_id: string
+    topic: string
+    date: string
+    duration: string | null
+    joined: number
+    avg_score: number | null
+    status: 'active' | 'done'
+    goal: string
+    traces: string[]
+  }>(`/lessons/${encodeURIComponent(lessonId)}/traces`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  }),
 
   // F4 学情
   getAcademicSummary: (code: string) => request<{
@@ -239,6 +253,7 @@ export const realClient = {
       name: string
       role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
       scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
+      background: string
       teacher_note: string
       updated_at: string
     }[]
@@ -252,6 +267,7 @@ export const realClient = {
     student_no: string
     scores: { subject: string; score: number; trend?: 'up' | 'down' | 'flat' }[]
     role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
+    background?: string
     teacher_note?: string
   }[]) => request<{
     records: {
@@ -260,6 +276,7 @@ export const realClient = {
       name: string
       role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
       scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
+      background: string
       teacher_note: string
       updated_at: string
     }[]
@@ -272,6 +289,33 @@ export const realClient = {
     method: 'POST',
     body: JSON.stringify({ records }),
   }),
+  manualAddAcademic: (code: string, entry: {
+    name: string
+    student_no?: string
+    scores: { subject: string; score: number }[]
+    role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
+    background?: string
+    teacher_note?: string
+  }) => request<{
+    records: {
+      student_id: string
+      student_no: string
+      name: string
+      role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
+      scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
+      background: string
+      teacher_note: string
+      updated_at: string
+    }[]
+    summary: {
+      count: number
+      avg_score: number
+      attention_count: number
+    }
+  }>(`/classes/${encodeURIComponent(code)}/academic/manual`, {
+    method: 'POST',
+    body: JSON.stringify(entry),
+  }),
   importAcademicFile: (code: string, file: File) => request<{
     records: {
       student_id: string
@@ -279,6 +323,7 @@ export const realClient = {
       name: string
       role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
       scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
+      background: string
       teacher_note: string
       updated_at: string
     }[]

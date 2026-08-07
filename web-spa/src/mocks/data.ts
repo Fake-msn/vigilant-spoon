@@ -109,6 +109,7 @@ export type AcademicRow = {
   id: string
   scores: SubjectScore[]
   role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
+  background: string
   note: string
 }
 
@@ -121,7 +122,8 @@ export const academicRows: AcademicRow[] = [
       { subject: '英语', score: 82, trend: 'flat' },
     ],
     role: 'member',
-    note: '课余常帮妈妈做家务，动手能力强，提到做蛋糕时眼睛发亮',
+    background: '课余常帮妈妈做家务，动手能力强，提到做蛋糕时眼睛发亮',
+    note: '',
   },
   {
     id: 'lxj',
@@ -131,7 +133,8 @@ export const academicRows: AcademicRow[] = [
       { subject: '英语', score: 71, trend: 'up' },
     ],
     role: 'group_leader',
-    note: '体育课表现突出，纪律性强，爷爷曾是退伍军人',
+    background: '体育课表现突出，纪律性强，爷爷曾是退伍军人',
+    note: '',
   },
   {
     id: 'zxh',
@@ -141,7 +144,8 @@ export const academicRows: AcademicRow[] = [
       { subject: '英语', score: 75, trend: 'flat' },
     ],
     role: 'member',
-    note: '喜欢画画，作文常写到山外面的世界，性格偏内向',
+    background: '喜欢画画，作文常写到山外面的世界，性格偏内向',
+    note: '',
   },
   {
     id: 'lxh',
@@ -151,7 +155,8 @@ export const academicRows: AcademicRow[] = [
       { subject: '英语', score: 80, trend: 'up' },
     ],
     role: 'subject_rep',
-    note: '对自然科学兴趣浓厚，常问"为什么"，家里支持读书',
+    background: '对自然科学兴趣浓厚，常问"为什么"，家里支持读书',
+    note: '',
   },
   {
     id: 'cxy',
@@ -161,7 +166,8 @@ export const academicRows: AcademicRow[] = [
       { subject: '英语', score: 58, trend: 'down' },
     ],
     role: 'member',
-    note: '父母外出务工，由奶奶照顾，近期上课注意力下降，需要更多关注',
+    background: '父母外出务工，由奶奶照顾，近期上课注意力下降，需要更多关注',
+    note: '',
   },
   {
     id: 'zxj',
@@ -171,7 +177,8 @@ export const academicRows: AcademicRow[] = [
       { subject: '英语', score: 84, trend: 'up' },
     ],
     role: 'subject_rep',
-    note: '乐于帮助同学讲题，说想像老师一样站上讲台',
+    background: '乐于帮助同学讲题，说想像老师一样站上讲台',
+    note: '',
   },
   {
     id: 'wxx',
@@ -181,7 +188,8 @@ export const academicRows: AcademicRow[] = [
       { subject: '英语', score: 69, trend: 'flat' },
     ],
     role: 'member',
-    note: '刚转学过来一学期，还在适应新环境，课堂发言较少',
+    background: '刚转学过来一学期，还在适应新环境，课堂发言较少',
+    note: '',
   },
   {
     id: 'zxy2',
@@ -191,7 +199,8 @@ export const academicRows: AcademicRow[] = [
       { subject: '英语', score: 79, trend: 'flat' },
     ],
     role: 'member',
-    note: '奶奶生病后开始说想当医生，责任感强，成绩稳步上升',
+    background: '奶奶生病后开始说想当医生，责任感强，成绩稳步上升',
+    note: '',
   },
 ]
 

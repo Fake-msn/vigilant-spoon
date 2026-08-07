@@ -251,16 +251,28 @@ export function TeacherClassroomPage() {
           </p>
           <span className="tag bg-brand-soft text-brand">共 {students.length} 人</span>
         </div>
+        {status?.state === 'active' && (
+          <p className="mb-3 text-xs text-ink-faint">
+            点击任意学生可手动点名，让他参与本轮互动。
+          </p>
+        )}
         <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
           {students.map((s) => {
             const active = status?.current_student === s.id
             return (
-              <div
+              <button
                 key={s.id}
-                className={`flex flex-col items-center gap-2 rounded-xl border p-4 transition-all ${
+                type="button"
+                disabled={status?.state !== 'active' || loading}
+                onClick={() => sendAction('select_student', { student_id: s.id })}
+                className={`flex flex-col items-center gap-2 rounded-xl border p-4 text-left transition-all ${
                   active
                     ? 'border-brand bg-brand-soft/50 ring-2 ring-brand/20'
                     : 'border-line bg-white'
+                } ${
+                  status?.state === 'active'
+                    ? 'cursor-pointer hover:border-brand/50 hover:bg-brand-faint/40'
+                    : 'cursor-default'
                 }`}
               >
                 <span className="overflow-hidden rounded-xl" style={{ width: 56, height: 56 }}>
@@ -268,7 +280,10 @@ export function TeacherClassroomPage() {
                 </span>
                 <span className="text-sm font-bold text-ink">{s.name}</span>
                 {active && <span className="tag bg-brand text-white !px-2 !py-0.5 !text-[10px]">发言中</span>}
-              </div>
+                {!active && status?.state === 'active' && (
+                  <span className="tag bg-brand-faint text-brand !px-2 !py-0.5 !text-[10px]">点名</span>
+                )}
+              </button>
             )
           })}
         </div>
