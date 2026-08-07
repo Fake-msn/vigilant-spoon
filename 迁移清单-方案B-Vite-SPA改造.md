@@ -190,9 +190,24 @@ web-spa/
 
 | 现有文件 | 目标位置 | 改动点 |
 |----------|----------|--------|
-| `lib/data.ts` | `src/mocks/data.ts` | **降级为 mock**：9 组常量保留供 vitest 与本地开发 mock 后端；页面一律改走 `api/client.ts`；类型 import 改自 `types/generated.ts`（字段名以契约为准映射：`dream→ideal`、`no→student_no`、`note` 保留等，映射表随 gen:types 落地时核对） |
+| `lib/data.ts` | `src/mocks/data.ts` | **降级为 mock**：9 组常量保留供 vitest 与本地开发 mock 后端；页面一律改走 `api/client.ts`；类型 import 改自 `types/generated.ts`（字段名以契约为准映射，详见下表） |
 | `public/design/*`（8 个素材） | `web-spa/public/design/` | 原样复制；引用路径不变 |
 | 演示脚本数据（chatScript 等） | `src/mocks/` + 后端 `scripts/seed.py` | 谈心脚本的确定性字段（理想/承诺）迁到后端 seed，前端不持有业务话术 |
+
+#### 4.5.1 字段映射对照表（契约 v2.1）
+
+| 旧字段（`web/lib/data.ts`） | 契约字段（`app/schemas/`） | 落点 | 备注 |
+|---------------------------|---------------------------|------|------|
+| `Student.no` | `Student.student_no` | `mocks/data.ts`、`seed.py` | 学号，字符串 |
+| `Student.dream` | `Student.ideal` | `mocks/data.ts`、`seed.py` | 理想职业，可选 |
+| `AcademicRow.relation` | `AcademicRow.role` | `mocks/data.ts`、`seed.py` | 枚举映射：亲近→`member`/`group_leader`/`subject_rep`（语义就近，不得为 `class_committee`）；一般→`member`；疏远→`member` |
+| `GrowthRow.petMood` | `GrowthRow.state` | `mocks/data.ts`、`seed.py` | `开心/平静/低落` → `daily`/`daily`/`gray`；`cheer` 由后端状态机根据正向信号触发 |
+| `GrowthRow.growth` | — | 已删除 | 成长值不再作为展示字段，禁 score |
+| `GrowthRow.scores` | — | 已删除 | 历次对话得分不再展示 |
+| `GrowthRow.evalSummary` | — | 已删除 | AI 评估摘要不再展示 |
+| `GrowthRow.signal` | `GrowthRow.signal` | `mocks/data.ts`、`seed.py` | 心理信号文案，仅 `gray` 态学生可含 |
+| `CourseRecord.avgScore` | — | 已删除 | 课程平均分不再展示 |
+| `Letter.unread` | `Letter.is_read` | `mocks/data.ts` | 语义取反：`unread=true` → `is_read=false` |
 
 ---
 

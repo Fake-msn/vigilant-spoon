@@ -1,0 +1,326 @@
+import { ApiClientError } from '@/api/client'
+import { academicRows, courseRecords, regions, students } from '@/mocks/data'
+import type { Profile } from '@/stores/session'
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+export const mockClient = {
+  async getClass(code: string) {
+    await delay(300)
+    if (code !== 'LTZ2024') {
+      throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    const region = regions[0]
+    return {
+      class_code: code,
+      class_name: '三（1）班',
+      school: '龙头山镇中心小学',
+      region_key: region.key,
+      region_name: region.name,
+      grade: '三年级',
+      class_no: '1',
+      students: students.map((s) => ({
+        id: s.id,
+        name: s.name,
+        student_no: s.student_no,
+        grade: s.grade,
+        avatar_seed: s.avatar_seed,
+        role: s.role ?? 'member',
+        region_key: region.key,
+        region_name: region.name,
+        ideal: s.ideal,
+      })),
+    }
+  },
+
+  async enter(code: string, studentName: string) {
+    await delay(300)
+    const student = students.find((s) => s.name === studentName)
+    if (!student) {
+      throw new ApiClientError('姓名不在班级名单中', 404, 'STUDENT_NOT_FOUND')
+    }
+    const region = regions[0]
+    const profile: Profile = {
+      id: student.id,
+      name: student.name,
+      grade: student.grade,
+      student_no: student.student_no,
+      avatar_seed: student.avatar_seed,
+      ideal: student.ideal,
+      class_code: code,
+      region_key: region.key,
+      region_name: region.name,
+    }
+    return {
+      session_token: `st_${student.id.padEnd(48, '0').slice(0, 48)}`,
+      profile,
+    }
+  },
+
+  async teacherEnter(code: string, teacherName: string) {
+    await delay(300)
+    if (code !== 'LTZ2024') {
+      throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    const region = regions[0]
+    return {
+      session_token: `st_${teacherName.padEnd(48, '0').slice(0, 48)}`,
+      profile: {
+        id: `teacher-${teacherName}`,
+        name: teacherName,
+        role: 'teacher' as const,
+        class_code: code,
+        class_name: '三（1）班',
+        school: '龙头山镇中心小学',
+        region_key: region.key,
+      },
+    }
+  },
+
+  async startClass(code: string) {
+    await delay(200)
+    if (code !== 'LTZ2024') {
+      throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    return {
+      session_id: `cls-${code}`,
+      state: 'active' as const,
+      current_student: students[0]?.id ?? null,
+      current_slot: null,
+      turn_count: 1,
+      updated_at: new Date().toISOString(),
+    }
+  },
+
+  async controlClass(
+    code: string,
+    action: string,
+    _clientCmdId: string,
+    payload?: Record<string, unknown>,
+  ) {
+    await delay(200)
+    if (code !== 'LTZ2024') {
+      throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    const slot = typeof payload?.slot === 'string' ? payload.slot : null
+    return {
+      session_id: `cls-${code}`,
+      state: action === 'pause' ? ('paused' as const) : ('active' as const),
+      current_student: students[0]?.id ?? null,
+      current_slot: slot,
+      turn_count: 1,
+      updated_at: new Date().toISOString(),
+    }
+  },
+
+  async getClassStatus(code: string) {
+    await delay(200)
+    if (code !== 'LTZ2024') {
+      throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    return {
+      session_id: `cls-${code}`,
+      state: 'idle' as const,
+      current_student: null,
+      current_slot: null,
+      turn_count: 0,
+      updated_at: new Date().toISOString(),
+    }
+  },
+
+  async getGrowth(studentId: string) {
+    await delay(200)
+    const student = students.find((s) => s.id === studentId)
+    if (!student) {
+      throw new ApiClientError('学生不存在', 404, 'STUDENT_NOT_FOUND')
+    }
+    return {
+      ideal: student.ideal ?? null,
+      commitments: [
+        { id: 'c1', text: '我要每天帮妈妈做一次家务', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' as const },
+        { id: 'c2', text: '我要学会做一个纸杯蛋糕', created_at: '2026-07-21T10:00:00+00:00', status: 'active' as const },
+      ],
+      last_gist: '这周揉了面团，离蛋糕师更近一步',
+      growth_value: 35,
+      stage: 'egg',
+      pet: {
+        species: 'cat',
+        stage: 2,
+        state: 'daily' as const,
+        growth_value: 35,
+        last_growth_at: new Date().toISOString(),
+        cheer_until: null,
+        needs_care: false,
+        portrait_url: null,
+        updated_at: new Date().toISOString(),
+      },
+      actions: null,
+      history: null,
+    }
+  },
+
+  async getPet(studentId: string) {
+    await delay(150)
+    const student = students.find((s) => s.id === studentId)
+    if (!student) {
+      throw new ApiClientError('学生不存在', 404, 'STUDENT_NOT_FOUND')
+    }
+    return {
+      species: 'cat',
+      stage: 2,
+      state: 'daily' as const,
+      growth_value: 35,
+      last_growth_at: new Date().toISOString(),
+      cheer_until: null,
+      needs_care: false,
+      portrait_url: null,
+      updated_at: new Date().toISOString(),
+    }
+  },
+
+  async createPortrait(studentId: string, idempotencyKey?: string) {
+    await delay(200)
+    const jobId = idempotencyKey ? `portrait-${studentId}-${idempotencyKey.slice(0, 16)}` : `portrait-${studentId}`
+    return { job_id: jobId }
+  },
+
+  async getJob(jobId: string) {
+    await delay(150)
+    return {
+      job_id: jobId,
+      status: 'done' as const,
+      result_url: `/static/portraits/${jobId}.png`,
+      error: null,
+    }
+  },
+
+  async generateLesson(topic: string, goals: string[], guidance?: string) {
+    await delay(400)
+    return {
+      lesson_id: `les-${Date.now().toString(36)}`,
+      topic,
+      goals,
+      guidance_strategy: guidance || '',
+      materials: [
+        { title: '开场素材', content: `围绕「${topic}」创设语境，引导学生说出具体理想。` },
+        ...(guidance ? [{ title: '引导策略', content: guidance }] : []),
+        ...goals.map((g) => ({ title: '教学目标', content: g })),
+      ],
+      created_at: new Date().toISOString(),
+    }
+  },
+
+  async getLesson(lessonId: string) {
+    await delay(200)
+    return {
+      lesson_id: lessonId,
+      topic: '示例课程',
+      goals: ['引导每位同学说出一个具体理想'],
+      guidance_strategy: '温和追问，鼓励内向学生先描述身边事。',
+      materials: [{ title: '开场素材', content: '围绕主题创设语境。' }],
+      created_at: new Date().toISOString(),
+    }
+  },
+
+  async getClassLessons(code: string) {
+    await delay(200)
+    if (code !== 'LTZ2024') {
+      throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    return courseRecords.map((c) => ({
+      lesson_id: c.id,
+      topic: c.title,
+      date: c.date,
+      duration: c.duration,
+      joined: c.joined,
+      avg_score: null,
+      status: c.status === '已完成' ? ('done' as const) : ('active' as const),
+      goal: c.goal,
+      traces: c.traces,
+    }))
+  },
+
+  async getAcademicSummary(code: string) {
+    await delay(200)
+    if (code !== 'LTZ2024') {
+      throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    const records = academicRows.map((r) => {
+      const s = students.find((x) => x.id === r.id)!
+      return {
+        student_id: r.id,
+        student_no: s.student_no,
+        name: s.name,
+        role: r.role,
+        scores: r.scores,
+        teacher_note: r.note,
+        updated_at: new Date().toISOString(),
+      }
+    })
+    const allScores = records.flatMap((r) => r.scores.map((s) => s.score))
+    const avg = allScores.length ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length) : 0
+    const attention = records.reduce((sum, r) => sum + r.scores.filter((s) => s.trend === 'down').length, 0)
+    return {
+      records,
+      summary: { count: records.length, avg_score: avg, attention_count: attention },
+    }
+  },
+
+  async importAcademicJson(code: string, records: { student_no: string; scores: { subject: string; score: number }[]; role: string; teacher_note?: string }[]) {
+    await delay(300)
+    if (code !== 'LTZ2024') {
+      throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    const mapped = records.map((r) => {
+      const s = students.find((x) => x.student_no === r.student_no)!
+      return {
+        student_id: s.id,
+        student_no: r.student_no,
+        name: s.name,
+        role: r.role as 'member' | 'group_leader' | 'class_committee' | 'subject_rep',
+        scores: r.scores.map((sc) => ({ ...sc, trend: 'flat' as const })),
+        teacher_note: r.teacher_note || '',
+        updated_at: new Date().toISOString(),
+      }
+    })
+    return {
+      records: mapped,
+      summary: {
+        count: mapped.length,
+        avg_score: 0,
+        attention_count: 0,
+      },
+    }
+  },
+
+  async importAcademicFile(code: string, _file: File) {
+    await delay(500)
+    if (code !== 'LTZ2024') {
+      throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    return this.getAcademicSummary(code)
+  },
+
+  async getClassPets(code: string) {
+    await delay(200)
+    if (code !== 'LTZ2024') {
+      throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    return students.map((s) => ({
+      student_id: s.id,
+      name: s.name,
+      avatar_seed: s.avatar_seed,
+      pet: {
+        species: 'cat',
+        stage: 2,
+        state: (s.id === 'cxy' || s.id === 'wxx' ? 'gray' : 'daily') as 'daily' | 'gray' | 'cheer',
+        growth_value: 35,
+        last_growth_at: new Date().toISOString(),
+        cheer_until: null,
+        needs_care: s.id === 'cxy' || s.id === 'wxx',
+        portrait_url: null,
+        updated_at: new Date().toISOString(),
+      },
+    }))
+  },
+}

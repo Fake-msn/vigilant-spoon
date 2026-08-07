@@ -1,0 +1,89 @@
+"""Pydantic schemas for 小信 API (contract v2.1)."""
+
+from app.schemas.classroom import (
+    ClassroomStatus,
+    ControlReq,
+)
+from app.schemas.common import ErrorEnvelope, HealthCheck
+from app.schemas.growth import (
+    AcademicRecord,
+    AcademicRecordInput,
+    AcademicSummary,
+    Commitment,
+    EvidenceItem,
+    GrowthView,
+    PetState,
+    ScoreCard,
+    SubjectScore,
+)
+from app.schemas.job import JobError, JobRef, JobStatus
+from app.schemas.lesson import LessonGenReq, LessonMaterial, LessonPlan, LessonSummary
+from app.schemas.letter import Letter
+from app.schemas.session import (
+    ClassInfo,
+    ClassPetView,
+    EnterReq,
+    EnterResp,
+    StudentProfile,
+    TeacherEnterReq,
+    TeacherEnterResp,
+    TeacherProfile,
+)
+from app.schemas.voice import (
+    AudioChunkEvent,
+    CommitTurnEvent,
+    ImageEvent,
+    SessionEndEvent,
+    SessionStartedEvent,
+    TranscriptEvent,
+    TurnEndEvent,
+    VADEndEvent,
+    VADStartEvent,
+    VoiceErrorEvent,
+    VoiceMode,
+    VoiceSessionReq,
+)
+
+__all__ = [
+    "AcademicRecord",
+    "AcademicRecordInput",
+    "AcademicSummary",
+    "ClassInfo",
+    "ClassPetView",
+    "ClassroomStatus",
+    "Commitment",
+    "ControlReq",
+    "EnterReq",
+    "EnterResp",
+    "ErrorEnvelope",
+    "EvidenceItem",
+    "GrowthView",
+    "HealthCheck",
+    "JobError",
+    "JobRef",
+    "JobStatus",
+    "LessonGenReq",
+    "LessonMaterial",
+    "LessonPlan",
+    "LessonSummary",
+    "Letter",
+    "PetState",
+    "ScoreCard",
+    "StudentProfile",
+    "SubjectScore",
+    "TeacherEnterReq",
+    "TeacherEnterResp",
+    "TeacherProfile",
+    "AudioChunkEvent",
+    "CommitTurnEvent",
+    "ImageEvent",
+    "SessionEndEvent",
+    "SessionStartedEvent",
+    "TranscriptEvent",
+    "TurnEndEvent",
+    "VADEndEvent",
+    "VADStartEvent",
+    "VoiceErrorEvent",
+    "VoiceMode",
+    "VoiceSessionReq",
+]
