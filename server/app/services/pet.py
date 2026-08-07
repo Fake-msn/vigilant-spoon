@@ -108,3 +108,46 @@ def transition(
 
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+# ---- 班宠积分制度：等级 / 饥饿 / 心情 ----
+
+# 阶梯式等级阈值：达到阈值即升级，越升越难
+LEVEL_THRESHOLDS = [0, 30, 70, 120, 180, 250]
+
+
+def level_for(points_total: int) -> int:
+    """根据累计积分推导宠物等级（1 起）。"""
+    level = 1
+    for threshold in LEVEL_THRESHOLDS[1:]:
+        if points_total >= threshold:
+            level += 1
+        else:
+            break
+    return level
+
+
+def apply_points(hunger: int, mood: int, points: int) -> tuple[int, int]:
+    """加减分后更新饥饿/心情。加分喂食（饥饿↓心情↑），扣分相反。"""
+    delta = max(-10, min(10, points))
+    new_hunger = max(0, min(100, hunger - delta))
+    new_mood = max(0, min(100, mood + delta))
+    return new_hunger, new_mood
+
+
+def decay(
+    hunger: int,
+    mood: int,
+    last_points_at: datetime | None,
+    now: datetime,
+    days_of_neglect: int | None = None,
+) -> tuple[int, int]:
+    """长期无积分时饥饿↑心情↓（每缺一天 ±2）。"""
+    if last_points_at is None:
+        return hunger, mood
+    days = days_of_neglect if days_of_neglect is not None else max(0, (now - last_points_at).days)
+    if days <= 0:
+        return hunger, mood
+    new_hunger = max(0, min(100, hunger + days * 2))
+    new_mood = max(0, min(100, mood - days * 2))
+    return new_hunger, new_mood
