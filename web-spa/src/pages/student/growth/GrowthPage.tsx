@@ -38,6 +38,10 @@ type GrowthData = {
     needs_care: boolean
     portrait_url: string | null
     updated_at: string
+    points_total: number
+    level: number
+    hunger: number
+    mood: number
   }
   actions: unknown[] | null
   history: unknown[] | null
@@ -45,10 +49,13 @@ type GrowthData = {
 
 type ChatItem = { date: string; topic: string; state: PetState; mins: number }
 
+type LedgerItem = { id: number; name: string; points: number; note: string | null; created_at: string }
+
 export function GrowthPage() {
   const [growth, setGrowth] = useState<GrowthData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [ledger, setLedger] = useState<LedgerItem[]>([])
 
   const { profile } = getSession()
   const studentId = profile && isStudentProfile(profile) ? profile.id : null
@@ -72,6 +79,22 @@ export function GrowthPage() {
       })
       .finally(() => {
         if (mounted) setLoading(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [studentId])
+
+  useEffect(() => {
+    if (!studentId) return
+    let mounted = true
+    api
+      .getStudentPoints(studentId)
+      .then((items) => {
+        if (mounted) setLedger(items)
+      })
+      .catch(() => {
+        // 积分流水加载失败时仅忽略，不影响页面展示
       })
     return () => {
       mounted = false
@@ -165,6 +188,7 @@ export function GrowthPage() {
         </div>
 
         {/* 电子宠物 */}
+        <div className="flex flex-col gap-5">
         <div className="card flex flex-col items-center gap-4 bg-gradient-to-b from-grape-soft/60 to-white p-7 text-center">
           <p className="w-full text-left text-sm font-bold text-ink">我的电子宠物</p>
           <span className="rounded-xl border-2 border-dashed border-grape/30 bg-white/70 px-6 py-4 animate-floaty">
@@ -190,6 +214,65 @@ export function GrowthPage() {
             </span>
             <Icon name="heart" size={18} className="text-red-400" fill="currentColor" />
           </div>
+          <div className="grid w-full grid-cols-2 gap-3">
+            <div className="rounded-lg border border-line bg-white/80 px-4 py-3 text-left">
+              <p className="text-xs text-ink-faint">累计积分</p>
+              <p className="mt-1 text-sm font-bold text-ink">{growth.pet.points_total ?? 0}</p>
+            </div>
+            <div className="rounded-lg border border-line bg-white/80 px-4 py-3 text-left">
+              <p className="text-xs text-ink-faint">等级</p>
+              <p className="mt-1 text-sm font-bold text-ink">Lv.{growth.pet.level ?? 1}</p>
+            </div>
+            <div className="rounded-lg border border-line bg-white/80 px-4 py-3 text-left">
+              <p className="text-xs text-ink-faint">饥饿度</p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line">
+                  <div
+                    className="h-full rounded-full bg-amber-400"
+                    style={{ width: `${Math.max(0, Math.min(100, growth.pet.hunger ?? 0))}%` }}
+                  />
+                </div>
+                <span className="text-xs font-bold text-ink">{growth.pet.hunger ?? 0}%</span>
+              </div>
+            </div>
+            <div className="rounded-lg border border-line bg-white/80 px-4 py-3 text-left">
+              <p className="text-xs text-ink-faint">心情</p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line">
+                  <div
+                    className="h-full rounded-full bg-mint"
+                    style={{ width: `${Math.max(0, Math.min(100, growth.pet.mood ?? 0))}%` }}
+                  />
+                </div>
+                <span className="text-xs font-bold text-ink">{growth.pet.mood ?? 0}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="card p-5">
+          <p className="flex items-center gap-2 text-sm font-bold text-ink">
+            <Icon name="sparkles" size={16} className="text-brand" />
+            积分流水
+          </p>
+          {ledger.length === 0 ? (
+            <p className="mt-4 text-sm text-ink-faint">暂无积分流水</p>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {ledger.map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{item.name}</p>
+                    <p className="mt-0.5 text-xs text-ink-faint">{item.created_at}</p>
+                  </div>
+                  <span className="shrink-0 text-sm font-bold text-brand">
+                    {item.points > 0 ? '+' : ''}
+                    {item.points}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         </div>
 
         {/* 承诺 + 谈心记录 */}

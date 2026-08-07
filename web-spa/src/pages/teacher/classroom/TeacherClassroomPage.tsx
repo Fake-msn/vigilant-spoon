@@ -36,6 +36,34 @@ export function TeacherClassroomPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [overview, setOverview] = useState<{ rules: { rule_id: string; name: string; points: number; enabled: boolean }[]; students: { id: string; name: string }[] }>({ rules: [], students: [] })
+  const [selectedStudent, setSelectedStudent] = useState('')
+  const [selectedRule, setSelectedRule] = useState('')
+  const [awarding, setAwarding] = useState(false)
+  const [awardMsg, setAwardMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.getPointOverview(classCode).then(setOverview).catch(() => {})
+  }, [classCode])
+
+  const award = async () => {
+    if (!selectedStudent || !selectedRule || awarding) return
+    setAwarding(true)
+    setAwardMsg(null)
+    try {
+      const res = await api.awardPoints(classCode, { student_id: selectedStudent, rule_id: selectedRule })
+      setAwardMsg(
+        res.leveled_up
+          ? `已加分，宠物升到 Lv.${res.level}！`
+          : `已${res.points > 0 ? '加' : '减'}分 ${Math.abs(res.points)}，当前累计 ${res.points_total}`
+      )
+    } catch (e) {
+      setAwardMsg(e instanceof Error ? e.message : '加分失败')
+    } finally {
+      setAwarding(false)
+    }
+  }
+
   const refresh = async () => {
     try {
       const [cls, st] = await Promise.all([
@@ -287,6 +315,58 @@ export function TeacherClassroomPage() {
             )
           })}
         </div>
+      </div>
+
+      {/* 积分 / 奖励 */}
+      <div className="card mt-6 p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm font-bold text-ink">
+            <Icon name="sparkles" size={15} className="mr-1.5 inline-block align-[-2px] text-grape" />
+            积分奖励（当场加减分，学生立刻看到宠物变化）
+          </p>
+          <span className="tag bg-grape-soft text-grape">共 {overview.rules.length} 条规则</span>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto]">
+          <label className="block">
+            <span className="text-xs font-semibold text-ink-faint">选择学生</span>
+            <select
+              value={selectedStudent}
+              onChange={(e) => setSelectedStudent(e.target.value)}
+              className="input-soft mt-2"
+            >
+              <option value="">请选择</option>
+              {overview.students.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-ink-faint">选择规则</span>
+            <select
+              value={selectedRule}
+              onChange={(e) => setSelectedRule(e.target.value)}
+              className="input-soft mt-2"
+            >
+              <option value="">请选择</option>
+              {overview.rules.map((r) => (
+                <option key={r.rule_id} value={r.rule_id}>{r.name}（{r.points > 0 ? '+' : ''}{r.points}）</option>
+              ))}
+            </select>
+          </label>
+          <button
+            onClick={award}
+            disabled={!selectedStudent || !selectedRule || awarding}
+            className="btn-brand self-end !px-5 !py-2.5"
+          >
+            <Icon name="sparkles" size={15} />
+            加分
+          </button>
+        </div>
+        {awardMsg && (
+          <p className="mt-3 rounded-lg bg-mint-soft/60 px-4 py-2.5 text-sm font-medium text-mint-deep animate-pop">
+            {awardMsg}
+          </p>
+        )}
       </div>
 
       {status?.state === 'active' && (

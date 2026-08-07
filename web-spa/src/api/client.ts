@@ -206,6 +206,10 @@ export const realClient = {
       needs_care: boolean
       portrait_url: string | null
       updated_at: string
+      points_total: number
+      level: number
+      hunger: number
+      mood: number
     }
     actions: unknown[] | null
     history: unknown[] | null
