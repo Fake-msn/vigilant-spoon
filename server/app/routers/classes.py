@@ -201,7 +201,8 @@ def list_class_pets(
             """
             SELECT s.student_id, s.name, s.avatar_seed,
                    g.state, g.growth_value, g.species, g.pet_stage,
-                   g.last_growth_at, g.cheer_until, g.needs_care, g.portrait_url
+                   g.last_growth_at, g.cheer_until, g.needs_care, g.portrait_url,
+                   g.points_total, g.level, g.hunger, g.mood
             FROM students s
             LEFT JOIN growth_records g ON s.student_id = g.student_id
             WHERE s.class_code = ?
@@ -221,6 +222,10 @@ def list_class_pets(
                 cheer_until=_parse_dt(row["cheer_until"]) if row["cheer_until"] else None,
                 needs_care=bool(row["needs_care"]),
                 portrait_url=row["portrait_url"],
+                points_total=row["points_total"] or 0,
+                level=row["level"] or 1,
+                hunger=row["hunger"] or 50,
+                mood=row["mood"] or 60,
                 updated_at=_parse_dt(row["last_growth_at"]),
             )
             views.append(

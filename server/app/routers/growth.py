@@ -79,6 +79,10 @@ def _build_pet_state(row: sqlite3.Row) -> PetState:
         cheer_until=_parse_dt(row["cheer_until"]) if row["cheer_until"] else None,
         needs_care=bool(row["needs_care"]),
         portrait_url=row["portrait_url"],
+        points_total=row["points_total"] or 0,
+        level=row["level"] or 1,
+        hunger=row["hunger"] or 50,
+        mood=row["mood"] or 60,
         updated_at=_parse_dt(row["last_growth_at"]),
     )
 

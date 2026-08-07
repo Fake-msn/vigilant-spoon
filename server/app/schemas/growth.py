@@ -26,6 +26,10 @@ class PetState(BaseModel):
     cheer_until: datetime | None = Field(default=None, description="鼓舞态有效期截止")
     needs_care: bool = Field(..., description="是否需要教师关注（gray 态置位）")
     portrait_url: str | None = Field(default=None, description="宠物画像 URL")
+    points_total: int = Field(default=0, description="累计积分")
+    level: int = Field(default=1, ge=1, description="宠物等级")
+    hunger: int = Field(default=50, ge=0, le=100, description="饥饿度")
+    mood: int = Field(default=60, ge=0, le=100, description="心情")
     updated_at: datetime = Field(..., description="更新时间")
 
 

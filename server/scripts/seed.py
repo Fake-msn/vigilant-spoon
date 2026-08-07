@@ -877,6 +877,11 @@ def seed(conn: sqlite3.Connection) -> None:
     logger.info("开始写入演示教师账号")
     seed_teacher(conn)
 
+    logger.info("开始写入班宠积分默认规则")
+    seed_point_rules(conn, CLASS["class_code"])
+    logger.info("开始写入班宠积分配置字段")
+    seed_points_config(conn)
+
     conn.commit()
     logger.info("数据库写入完成")
 
@@ -907,6 +912,49 @@ def seed_teacher(conn: sqlite3.Connection) -> None:
         VALUES (?, ?)
         """,
         (teacher_id, CLASS["class_code"]),
+    )
+
+
+DEFAULT_POINT_RULES: list[tuple[str, str, int]] = [
+    ("hand-raise", "主动举手发言", 5),
+    ("answer", "回答正确", 10),
+    ("homework-on-time", "作业按时提交", 8),
+    ("homework-excellent", "作业优秀", 15),
+]
+
+
+def seed_point_rules(conn: sqlite3.Connection, class_code: str) -> None:
+    """写入班级默认积分规则（幂等）。"""
+    now = "2026-08-08T00:00:00+00:00"
+    for i, (cat, name, points) in enumerate(DEFAULT_POINT_RULES):
+        conn.execute(
+            "INSERT OR IGNORE INTO point_rules "
+            "(rule_id, class_code, name, points, category, enabled, sort, created_at) "
+            "VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
+            (f"{class_code}-{cat}", class_code, name, points, cat, i, now),
+        )
+
+
+def seed_points_config(conn: sqlite3.Connection) -> None:
+    """为所有有成长记录的学生初始化积分字段（成长值线性映射为积分）。"""
+    now = "2026-08-07T10:00:00+00:00"
+    conn.execute(
+        """
+        UPDATE growth_records
+        SET points_total = growth_value,
+            level = CASE
+                WHEN growth_value >= 250 THEN 6
+                WHEN growth_value >= 180 THEN 5
+                WHEN growth_value >= 120 THEN 4
+                WHEN growth_value >= 70 THEN 3
+                WHEN growth_value >= 30 THEN 2
+                ELSE 1
+            END
+        """
+    )
+    conn.execute(
+        "UPDATE growth_records SET last_points_at = ?",
+        (now,),
     )
 
 
