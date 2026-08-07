@@ -615,4 +615,53 @@ export const mockClient = {
     }
     return this.getPendingTeachers()
   },
+
+  // 班宠积分制度（mock：内存态）
+  async getPointRules(code: string) {
+    await delay(200)
+    if (code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    return [
+      { rule_id: 'LTZ2024-hand-raise', name: '主动举手发言', points: 5, category: 'hand-raise', enabled: true },
+      { rule_id: 'LTZ2024-answer', name: '回答正确', points: 10, category: 'answer', enabled: true },
+      { rule_id: 'LTZ2024-homework-on-time', name: '作业按时提交', points: 8, category: 'homework-on-time', enabled: true },
+      { rule_id: 'LTZ2024-homework-excellent', name: '作业优秀', points: 15, category: 'homework-excellent', enabled: true },
+    ]
+  },
+  async updatePointRules(code: string, rules: { name: string; points: number }[]) {
+    await delay(200)
+    if (code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    return rules.map((r, i) => ({ rule_id: `LTZ2024-custom-${i}`, name: r.name, points: r.points, category: null, enabled: true }))
+  },
+  async awardPoints(code: string, req: { student_id: string; points?: number | null; name?: string | null }) {
+    await delay(200)
+    if (code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    const points = req.points ?? 5
+    return { student_id: req.student_id, points, points_total: points, level: 1, leveled_up: false, hunger: 45, mood: 65, state: 'daily', ledger_id: Date.now() }
+  },
+  async getPointOverview(code: string) {
+    await delay(200)
+    if (code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    return {
+      rules: [
+        { rule_id: 'LTZ2024-hand-raise', name: '主动举手发言', points: 5, category: 'hand-raise', enabled: true },
+        { rule_id: 'LTZ2024-answer', name: '回答正确', points: 10, category: 'answer', enabled: true },
+        { rule_id: 'LTZ2024-homework-on-time', name: '作业按时提交', points: 8, category: 'homework-on-time', enabled: true },
+        { rule_id: 'LTZ2024-homework-excellent', name: '作业优秀', points: 15, category: 'homework-excellent', enabled: true },
+      ],
+      students: students.map((s) => ({ id: s.id, name: s.name, group_id: null })),
+      groups: [],
+    }
+  },
+  async getGroups() { await delay(200); return [] },
+  async configGroups(code: string, groups: { group_name: string }[]) {
+    await delay(200)
+    if (code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    return groups.map((g, i) => ({ group_id: `LTZ2024-g0${i + 1}`, group_name: g.group_name, color: null, members: [] }))
+  },
+  async getLeaderboard(code: string) {
+    await delay(200)
+    if (code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    return { items: [] }
+  },
+  async getStudentPoints() { await delay(200); return [] },
 }

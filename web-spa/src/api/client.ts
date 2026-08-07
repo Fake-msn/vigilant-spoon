@@ -390,6 +390,101 @@ export const realClient = {
     })(),
   }),
 
+  // 班宠积分制度
+  getPointRules: (code: string) => request<{
+    rule_id: string
+    name: string
+    points: number
+    category: string | null
+    enabled: boolean
+  }[]>(`/classes/${encodeURIComponent(code)}/points/rules`),
+  updatePointRules: (code: string, rules: {
+    rule_id?: string | null
+    name: string
+    points: number
+    category?: string | null
+    enabled?: boolean
+  }[]) => request<{
+    rule_id: string
+    name: string
+    points: number
+    category: string | null
+    enabled: boolean
+  }[]>(`/classes/${encodeURIComponent(code)}/points/rules`, {
+    method: 'PUT',
+    body: JSON.stringify({ rules }),
+  }),
+  awardPoints: (code: string, req: {
+    student_id: string
+    rule_id?: string | null
+    points?: number | null
+    name?: string | null
+    note?: string | null
+  }) => request<{
+    student_id: string
+    points: number
+    points_total: number
+    level: number
+    leveled_up: boolean
+    hunger: number
+    mood: number
+    state: string
+    ledger_id: number
+  }>(`/classes/${encodeURIComponent(code)}/points/award`, {
+    method: 'POST',
+    body: JSON.stringify(req),
+  }),
+  getPointOverview: (code: string) => request<{
+    rules: {
+      rule_id: string
+      name: string
+      points: number
+      category: string | null
+      enabled: boolean
+    }[]
+    students: { id: string; name: string; group_id: string | null }[]
+    groups: {
+      group_id: string
+      group_name: string
+      color: string | null
+      members: string[]
+    }[]
+  }>(`/classes/${encodeURIComponent(code)}/points/overview`),
+  getGroups: (code: string) => request<{
+    group_id: string
+    group_name: string
+    color: string | null
+    members: string[]
+  }[]>(`/classes/${encodeURIComponent(code)}/groups`),
+  configGroups: (code: string, groups: {
+    group_name: string
+    color?: string | null
+  }[], assignments: Record<string, string>) => request<{
+    group_id: string
+    group_name: string
+    color: string | null
+    members: string[]
+  }[]>(`/classes/${encodeURIComponent(code)}/groups`, {
+    method: 'PUT',
+    body: JSON.stringify({ groups, assignments }),
+  }),
+  getLeaderboard: (code: string) => request<{
+    items: {
+      group_id: string
+      group_name: string
+      color: string | null
+      total_points: number
+      member_count: number
+    }[]
+  }>(`/classes/${encodeURIComponent(code)}/leaderboard`),
+  getStudentPoints: (studentId: string) => request<{
+    id: number
+    name: string
+    points: number
+    note: string | null
+    created_at: string
+  }[]>(`/students/${encodeURIComponent(studentId)}/points`),
+
   // 方案 5.3 管理员后台
   adminLogin: async (password: string) => {
     const resp = await adminRequest<{ session_token: string; expires_at: string }>('/admin/login', {
