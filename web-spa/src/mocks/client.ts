@@ -588,6 +588,10 @@ export const mockClient = {
       image_model: 'wanx2.1-t2i-turbo',
       image_base_url: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image',
       image_api_key: '',
+      embed_provider: 'disabled',
+      embed_model: 'text-embedding-v3',
+      embed_base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      embed_api_key: '',
     }
   },
   async updateAdminConfig() {
@@ -618,6 +622,42 @@ export const mockClient = {
       account.status = req.approve ? 'active' : 'rejected'
     }
     return this.getPendingTeachers()
+  },
+
+  // RAG 知识库（mock：静态演示数据）
+  async getKnowledgeStatus() {
+    await delay(200)
+    return {
+      embed_provider: 'dashscope',
+      embed_model: 'text-embedding-v3',
+      configured: true,
+      doc_count: 6,
+      chunk_count: 6,
+    }
+  },
+  async getKnowledgeDocs() {
+    await delay(200)
+    const items = [
+      { doc_id: 'kd-seed-1', title: '思政课：我的梦想与理想教育', category: 'lesson', source: 'seed', chunk_count: 1, created_at: new Date().toISOString() },
+      { doc_id: 'kd-seed-2', title: '思政课：家乡与远方', category: 'lesson', source: 'seed', chunk_count: 1, created_at: new Date().toISOString() },
+      { doc_id: 'kd-seed-3', title: '评语范例：鼓励内向学生', category: 'comment', source: 'seed', chunk_count: 1, created_at: new Date().toISOString() },
+      { doc_id: 'kd-seed-4', title: '评语范例：留守儿童关怀', category: 'comment', source: 'seed', chunk_count: 1, created_at: new Date().toISOString() },
+      { doc_id: 'kd-seed-5', title: '班级规范：课堂发言', category: 'classroom', source: 'seed', chunk_count: 1, created_at: new Date().toISOString() },
+      { doc_id: 'kd-seed-6', title: '班级规范：作业与小组合作', category: 'classroom', source: 'seed', chunk_count: 1, created_at: new Date().toISOString() },
+    ]
+    return { items, total: items.length }
+  },
+  async createKnowledgeDoc() {
+    await delay(200)
+    return this.getKnowledgeDocs()
+  },
+  async seedKnowledge() {
+    await delay(200)
+    return this.getKnowledgeDocs()
+  },
+  async deleteKnowledgeDoc() {
+    await delay(200)
+    return this.getKnowledgeDocs()
   },
 
   // 班宠积分制度（mock：内存态）

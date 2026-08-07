@@ -85,6 +85,27 @@ export type ServiceConfig = {
   image_model: string
   image_base_url: string
   image_api_key: string
+  embed_provider: string
+  embed_model: string
+  embed_base_url: string
+  embed_api_key: string
+}
+
+export type KnowledgeDoc = {
+  doc_id: string
+  title: string
+  category: string
+  source: string
+  chunk_count: number
+  created_at: string
+}
+
+export type KnowledgeStatus = {
+  embed_provider: string
+  embed_model: string
+  configured: boolean
+  doc_count: number
+  chunk_count: number
 }
 
 // 管理员会话独立存储（与学生/教师 token 互不影响）
@@ -508,6 +529,20 @@ export const realClient = {
       method: 'POST',
       body: JSON.stringify(req),
     }),
+  getKnowledgeStatus: () => adminRequest<KnowledgeStatus>('/admin/knowledge/status'),
+  getKnowledgeDocs: () => adminRequest<{ items: KnowledgeDoc[]; total: number }>('/admin/knowledge'),
+  createKnowledgeDoc: (doc: { title: string; content: string; category: string }) =>
+    adminRequest<{ items: KnowledgeDoc[]; total: number }>('/admin/knowledge', {
+      method: 'POST',
+      body: JSON.stringify({ ...doc, source: 'manual' }),
+    }),
+  seedKnowledge: () =>
+    adminRequest<{ items: KnowledgeDoc[]; total: number }>('/admin/knowledge/seed', { method: 'POST' }),
+  deleteKnowledgeDoc: (docId: string) =>
+    adminRequest<{ items: KnowledgeDoc[]; total: number }>(
+      `/admin/knowledge/${encodeURIComponent(docId)}`,
+      { method: 'DELETE' },
+    ),
 }
 
 export const api = USE_MOCK ? mockClient : realClient

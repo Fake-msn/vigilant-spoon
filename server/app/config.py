@@ -26,7 +26,13 @@ class Settings(BaseSettings):
     image_base_url: str = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image"
     image_api_key: str | None = None
 
-    # ---- 4. 管理员后台（方案 5.3）----
+    # ---- 4. RAG embedding（知识库向量化）----
+    embed_provider: str = "disabled"  # disabled | dashscope
+    embed_model: str = "text-embedding-v3"
+    embed_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    embed_api_key: str | None = None
+
+    # ---- 5. 管理员后台（方案 5.3）----
     admin_password: str = "admin123"  # 管理员后台登录密码
 
 

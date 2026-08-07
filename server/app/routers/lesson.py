@@ -20,6 +20,7 @@ from app.schemas import (
     TraceCreate,
 )
 from app.schemas.common import ErrorEnvelope
+from app.services import rag
 from app.services.llm import chat_completion
 
 router = APIRouter(tags=["lessons"])
@@ -115,12 +116,19 @@ def _template_materials(req: LessonGenReq) -> list[LessonMaterial]:
 def _llm_materials(req: LessonGenReq) -> list[LessonMaterial] | None:
     """尝试用 LLM 生成备课素材；未配置 / 解析失败时返回 None 以回退模板。"""
     goals_text = "；".join(req.goals) if req.goals else "（未指定）"
+    # RAG：按主题检索备课相关素材，作为参考注入 prompt（仅限备课，不参与对话轮次）
+    rag_context = rag.build_context(req.topic, top_k=3, category="lesson")
     system = (
         "你是「小信」的备课助手。根据课程主题与教学目标生成一份教案素材，"
         "只输出 JSON，不要输出任何额外文字。格式："
         '{"materials": [{"title": "素材标题", "content": "素材内容"}, ...]}'
         "其中应包含开场素材、引导策略、教学目标等 3-5 条素材。"
     )
+    if rag_context:
+        system += (
+            "\n\n以下是从知识库检索到的相关参考资料，请优先参考以贴近实际教学：\n"
+            + rag_context
+        )
     user = (
         f"课程主题：{req.topic}\n"
         f"教学目标：{goals_text}\n"

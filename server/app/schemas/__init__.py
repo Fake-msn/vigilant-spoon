@@ -1,6 +1,15 @@
 """Pydantic schemas for 小信 API (contract v2.1)."""
 
-from app.schemas.admin import AdminLoginReq, AdminLoginResp, ServiceConfig, ServiceConfigUpdate
+from app.schemas.admin import (
+    AdminLoginReq,
+    AdminLoginResp,
+    KnowledgeDoc,
+    KnowledgeDocCreate,
+    KnowledgeDocList,
+    KnowledgeStatus,
+    ServiceConfig,
+    ServiceConfigUpdate,
+)
 from app.schemas.classroom import (
     ClassroomStatus,
     ControlReq,
@@ -143,6 +152,10 @@ __all__ = [
     "AudioChunkEvent",
     "CommitTurnEvent",
     "ImageEvent",
+    "KnowledgeDoc",
+    "KnowledgeDocCreate",
+    "KnowledgeDocList",
+    "KnowledgeStatus",
     "SessionEndEvent",
     "SessionStartedEvent",
     "TranscriptEvent",

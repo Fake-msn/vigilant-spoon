@@ -27,6 +27,10 @@ class ServiceConfig(BaseModel):
     image_model: str = ""
     image_base_url: str = ""
     image_api_key: str = ""
+    embed_provider: str = "disabled"
+    embed_model: str = ""
+    embed_base_url: str = ""
+    embed_api_key: str = ""
 
 
 class ServiceConfigUpdate(BaseModel):
@@ -44,3 +48,36 @@ class ServiceConfigUpdate(BaseModel):
     image_model: str | None = None
     image_base_url: str | None = None
     image_api_key: str | None = None
+    embed_provider: str | None = None
+    embed_model: str | None = None
+    embed_base_url: str | None = None
+    embed_api_key: str | None = None
+
+
+class KnowledgeDocCreate(BaseModel):
+    title: str = Field(..., min_length=1, description="文档标题")
+    content: str = Field(..., min_length=1, description="文档正文")
+    category: str = Field("general", description="分类：lesson/comment/classroom/general")
+    source: str = Field("manual", description="来源")
+
+
+class KnowledgeDoc(BaseModel):
+    doc_id: str
+    title: str
+    category: str
+    source: str
+    chunk_count: int
+    created_at: str
+
+
+class KnowledgeDocList(BaseModel):
+    items: list[KnowledgeDoc]
+    total: int
+
+
+class KnowledgeStatus(BaseModel):
+    embed_provider: str
+    embed_model: str
+    configured: bool
+    doc_count: int
+    chunk_count: int

@@ -11,6 +11,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.services import rag
 from app.services.llm import chat_completion
 
 logger = logging.getLogger("letter")
@@ -89,6 +90,14 @@ def _generate_with_llm(ctx: LetterContext) -> GeneratedLetter | None:
         '{"title": "标题", "body": ["第一段", "第二段", ...]}'
     )
     needs_care = ctx.state == "gray" or ctx.needs_care
+    # RAG：对需关怀学生检索关怀类评语范例，作为语气与内容参考（仅限评语生成）
+    if needs_care:
+        rag_context = rag.build_context("关怀 留守儿童 情绪支持", top_k=2, category="comment")
+        if rag_context:
+            system += (
+                "\n\n以下是从知识库检索到的关怀评语范例，请参考其语气与原则：\n"
+                + rag_context
+            )
     user = (
         f"学生：{ctx.school}{ctx.grade}的{ctx.student_name}。\n"
         f"理想：{ctx.ideal or '未知'}。\n"

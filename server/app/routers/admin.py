@@ -19,6 +19,10 @@ from app.deps import get_current_admin
 from app.schemas import (
     AdminLoginReq,
     AdminLoginResp,
+    KnowledgeDoc,
+    KnowledgeDocCreate,
+    KnowledgeDocList,
+    KnowledgeStatus,
     PendingTeacherReview,
     PendingTeacherReviewList,
     ServiceConfig,
@@ -26,7 +30,7 @@ from app.schemas import (
     TeacherReviewReq,
 )
 from app.schemas.common import ErrorEnvelope
-from app.services import runtime_config
+from app.services import rag, runtime_config
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -163,3 +167,95 @@ def review_teacher(
         return PendingTeacherReviewList(items=[_row_to_review(r) for r in rows])
     finally:
         conn.close()
+
+
+# ---- RAG 知识库管理 ----
+
+CONFIG_CLASSES: dict[str, str] = {
+    "lesson": "备课素材",
+    "comment": "评语范例",
+    "classroom": "班级规范",
+    "general": "通用",
+}
+
+
+def _doc_not_found(doc_id: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=ErrorEnvelope(
+            code="KNOWLEDGE_DOC_NOT_FOUND",
+            message="知识文档不存在",
+            details={"doc_id": doc_id},
+        ).model_dump(),
+    )
+
+
+@router.get("/knowledge", response_model=KnowledgeDocList)
+def list_knowledge(_admin: str = Depends(get_current_admin)) -> KnowledgeDocList:
+    """列出知识库全部文档。"""
+    items = [
+        KnowledgeDoc(
+            doc_id=str(d["doc_id"]),
+            title=str(d["title"]),
+            category=str(d["category"]),
+            source=str(d["source"]),
+            chunk_count=int(d["chunk_count"]),
+            created_at=str(d["created_at"]),
+        )
+        for d in rag.list_documents()
+    ]
+    return KnowledgeDocList(items=items, total=len(items))
+
+
+@router.post("/knowledge", response_model=KnowledgeDocList)
+def create_knowledge(
+    req: KnowledgeDocCreate,
+    _admin: str = Depends(get_current_admin),
+) -> KnowledgeDocList:
+    """新增知识文档（分块 + 向量化 + 入库）。"""
+    doc_id = rag.add_document(
+        req.title,
+        req.content,
+        category=req.category,
+        source=req.source,
+    )
+    if doc_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ErrorEnvelope(
+                code="EMBEDDING_UNAVAILABLE",
+                message="embedding 未配置或向量化失败，文档未入库",
+            ).model_dump(),
+        )
+    return list_knowledge(_admin)
+
+
+@router.post("/knowledge/seed", response_model=KnowledgeDocList)
+def seed_knowledge(_admin: str = Depends(get_current_admin)) -> KnowledgeDocList:
+    """写入内置种子语料（幂等）。"""
+    rag.seed_default_corpus()
+    return list_knowledge(_admin)
+
+
+@router.delete("/knowledge/{doc_id}", response_model=KnowledgeDocList)
+def delete_knowledge(
+    doc_id: str,
+    _admin: str = Depends(get_current_admin),
+) -> KnowledgeDocList:
+    """删除知识文档及其分块。"""
+    if not rag.remove_document(doc_id):
+        raise _doc_not_found(doc_id)
+    return list_knowledge(_admin)
+
+
+@router.get("/knowledge/status", response_model=KnowledgeStatus)
+def knowledge_status(_admin: str = Depends(get_current_admin)) -> KnowledgeStatus:
+    """知识库状态：embedding 配置与文档 / 分块计数。"""
+    doc_count, chunk_count = rag.count_documents()
+    return KnowledgeStatus(
+        embed_provider=runtime_config.get("embed_provider"),
+        embed_model=runtime_config.get("embed_model"),
+        configured=rag.embedding_configured(),
+        doc_count=doc_count,
+        chunk_count=chunk_count,
+    )

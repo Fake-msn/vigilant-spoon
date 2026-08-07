@@ -31,6 +31,11 @@ CONFIG_KEYS: tuple[str, ...] = (
     "image_model",
     "image_base_url",
     "image_api_key",
+    # RAG embedding
+    "embed_provider",
+    "embed_model",
+    "embed_base_url",
+    "embed_api_key",
 )
 
 
@@ -49,6 +54,10 @@ def _defaults() -> dict[str, str]:
         "image_model": settings.image_model,
         "image_base_url": settings.image_base_url,
         "image_api_key": settings.image_api_key or "",
+        "embed_provider": settings.embed_provider,
+        "embed_model": settings.embed_model,
+        "embed_base_url": settings.embed_base_url,
+        "embed_api_key": settings.embed_api_key or "",
     }
 
 

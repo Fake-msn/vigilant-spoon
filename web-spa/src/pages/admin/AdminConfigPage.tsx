@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '@/api/client'
-import { getAdminToken, setAdminToken, type PendingTeacher, type ServiceConfig } from '@/api/client'
+import { getAdminToken, setAdminToken, type KnowledgeDoc, type PendingTeacher, type ServiceConfig } from '@/api/client'
 import { Icon } from '@/components/Icon'
 
 const EMPTY_CONFIG: ServiceConfig = {
@@ -17,6 +17,10 @@ const EMPTY_CONFIG: ServiceConfig = {
   image_model: '',
   image_base_url: '',
   image_api_key: '',
+  embed_provider: 'disabled',
+  embed_model: '',
+  embed_base_url: '',
+  embed_api_key: '',
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -223,6 +227,163 @@ function TeacherReviewSection() {
   )
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  lesson: '备课素材',
+  comment: '评语范例',
+  classroom: '班级规范',
+  general: '通用',
+}
+
+function KnowledgeSection() {
+  const [docs, setDocs] = useState<KnowledgeDoc[]>([])
+  const [status, setStatus] = useState<{ configured: boolean; doc_count: number; chunk_count: number } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [form, setForm] = useState({ title: '', content: '', category: 'lesson' })
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [docResp, statusResp] = await Promise.all([api.getKnowledgeDocs(), api.getKnowledgeStatus()])
+      setDocs(docResp.items)
+      setStatus(statusResp)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '加载知识库失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const seed = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      const resp = await api.seedKnowledge()
+      setDocs(resp.items)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '写入种子语料失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (docId: string) => {
+    setBusy(true)
+    setError('')
+    try {
+      const resp = await api.deleteKnowledgeDoc(docId)
+      setDocs(resp.items)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '删除失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const create = async () => {
+    if (!form.title.trim() || !form.content.trim()) return
+    setCreating(true)
+    setError('')
+    try {
+      const resp = await api.createKnowledgeDoc({
+        title: form.title.trim(),
+        content: form.content.trim(),
+        category: form.category,
+      })
+      setDocs(resp.items)
+      setForm({ title: '', content: '', category: 'lesson' })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '新增失败')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  return (
+    <section className="card p-6 md:p-7">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-white text-sm font-bold">4</span>
+          <div>
+            <h2 className="text-base font-bold text-ink">RAG 知识库</h2>
+            <p className="text-[12px] text-ink-soft">为备课素材 / 评语生成提供检索增强（仅限开场素材 / 备课 / 评语）</p>
+          </div>
+        </div>
+        {status ? (
+          <span className={`tag ${status.configured ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+            {status.configured ? '已配置' : '未配置 embedding'} · {status.doc_count} 文档 / {status.chunk_count} 分块
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <div>
+          <h3 className="text-sm font-bold text-ink">新增文档</h3>
+          <div className="mt-3 space-y-3">
+            <Field label="标题">
+              <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="文档标题" className="input-soft" />
+            </Field>
+            <Field label="分类">
+              <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="input-soft">
+                {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="正文" hint="保存时将自动分块并向量化；embedding 未配置时无法入库">
+              <textarea value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} rows={4} placeholder="请输入知识正文" className="input-soft resize-none" />
+            </Field>
+            <button onClick={create} disabled={creating || !form.title.trim() || !form.content.trim()} className="btn-brand w-full !py-2.5">
+              <Icon name="check" size={14} />
+              {creating ? '向量化中…' : '新增入库'}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-ink">已有文档（{docs.length}）</h3>
+            <button onClick={seed} disabled={busy} className="btn-line !px-3 !py-1.5 text-xs">
+              <Icon name="refresh" size={13} />
+              写入种子语料
+            </button>
+          </div>
+          <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+            {loading ? (
+              <p className="text-sm text-ink-soft">加载中…</p>
+            ) : docs.length === 0 ? (
+              <p className="rounded-xl bg-brand-soft/40 px-4 py-6 text-center text-sm text-ink-soft">知识库暂无文档</p>
+            ) : (
+              docs.map((doc) => (
+                <div key={doc.doc_id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{doc.title}</p>
+                    <p className="mt-0.5 text-[11px] text-ink-faint">
+                      {CATEGORY_LABELS[doc.category] ?? doc.category} · {doc.chunk_count} 块
+                      {doc.source === 'seed' ? ' · 内置' : ''}
+                    </p>
+                  </div>
+                  <button onClick={() => remove(doc.doc_id)} disabled={busy} className="shrink-0 text-xs font-medium text-ink-faint transition-colors hover:text-red-600">
+                    删除
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+      {error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}
+    </section>
+  )
+}
+
 export function AdminConfigPage() {
   const [authed, setAuthed] = useState(() => !!getAdminToken())
   const [config, setConfig] = useState<ServiceConfig>(EMPTY_CONFIG)
@@ -378,6 +539,27 @@ export function AdminConfigPage() {
                 <input type="password" value={config.image_api_key} onChange={(e) => set('image_api_key', e.target.value)} placeholder="留空则回退占位图" className="input-soft" />
               </Field>
             </Section>
+          <Section index="4" title="RAG Embedding" desc="知识库向量化所用模型（方案 5.4）">
+              <Field label="Provider">
+                <select value={config.embed_provider} onChange={(e) => set('embed_provider', e.target.value)} className="input-soft">
+                  <option value="disabled">disabled（关闭检索，零额度）</option>
+                  <option value="dashscope">dashscope（text-embedding）</option>
+                </select>
+              </Field>
+              <Field label="Embedding Model">
+                <input value={config.embed_model} onChange={(e) => set('embed_model', e.target.value)} placeholder="text-embedding-v3" className="input-soft" />
+              </Field>
+              <Field label="Base URL">
+                <input value={config.embed_base_url} onChange={(e) => set('embed_base_url', e.target.value)} className="input-soft" />
+              </Field>
+              <Field label="API Key">
+                <input type="password" value={config.embed_api_key} onChange={(e) => set('embed_api_key', e.target.value)} placeholder="留空则关闭检索" className="input-soft" />
+              </Field>
+            </Section>
+          </div>
+
+          <div className="mt-5 animate-rise">
+            <KnowledgeSection />
           </div>
 
           <div className="mt-5 animate-rise">
