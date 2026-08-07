@@ -1,11 +1,17 @@
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Icon } from '@/components/Icon'
 import { KidAvatar } from '@/components/art/KidAvatar'
-import { getSession, isStudentProfile } from '@/stores/session'
+import { clearSession, getSession, isStudentProfile } from '@/stores/session'
 
 export function StudentHomePage() {
+  const navigate = useNavigate()
   const { profile } = getSession()
   if (!profile || !isStudentProfile(profile)) return <Navigate to="/" replace />
+
+  const switchClassmate = () => {
+    clearSession()
+    navigate('/identity', { replace: true })
+  }
 
   const entries = [
     {
@@ -83,13 +89,13 @@ export function StudentHomePage() {
             <Icon name="archive" size={15} />
             我的成长档案
           </Link>
-          <Link
-            to="/identity"
+          <button
+            onClick={switchClassmate}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-faint transition-colors hover:text-brand"
           >
             <Icon name="refresh" size={14} />
             换个同学进入
-          </Link>
+          </button>
         </div>
       </div>
     </div>

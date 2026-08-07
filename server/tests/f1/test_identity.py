@@ -228,3 +228,133 @@ def test_auth_expired_token_returns_401_expired(monkeypatch: MonkeyPatch) -> Non
         assert data["code"] == "TOKEN_EXPIRED"
     finally:
         Path(db_path).unlink(missing_ok=True)
+
+
+def _teacher_login() -> str:
+    response = client.post(
+        "/api/session/teacher/enter",
+        json={"class_code": "LTZ2024", "teacher_name": "王老师"},
+    )
+    assert response.status_code == 200
+    return response.json()["session_token"]
+
+
+def test_teacher_enter_persists_account_and_lists_class(monkeypatch: MonkeyPatch) -> None:
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = tmp.name
+
+    monkeypatch.setattr(settings, "database_path", db_path)
+
+    try:
+        _seed_db(db_path)
+        token = _teacher_login()
+
+        response = client.get(
+            "/api/session/teacher/classes",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["teacher_id"] == "teacher-王老师"
+        assert data["name"] == "王老师"
+        assert data["school"] == "龙头山镇中心小学"
+        assert any(c["class_code"] == "LTZ2024" for c in data["classes"])
+    finally:
+        Path(db_path).unlink(missing_ok=True)
+
+
+def test_teacher_classes_rejects_student(monkeypatch: MonkeyPatch) -> None:
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = tmp.name
+
+    monkeypatch.setattr(settings, "database_path", db_path)
+
+    try:
+        _seed_db(db_path)
+        enter_response = client.post(
+            "/api/session/enter",
+            json={"class_code": "LTZ2024", "student_name": "王小雅"},
+        )
+        token = enter_response.json()["session_token"]
+
+        response = client.get(
+            "/api/session/teacher/classes",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 403
+        data = response.json()
+        assert data["code"] == "NOT_TEACHER"
+    finally:
+        Path(db_path).unlink(missing_ok=True)
+
+
+def test_teacher_switch_class_issues_new_token(monkeypatch: MonkeyPatch) -> None:
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = tmp.name
+
+    monkeypatch.setattr(settings, "database_path", db_path)
+
+    try:
+        _seed_db(db_path)
+        # 建一个额外班级并让教师关联
+        create_response = client.post(
+            "/api/classes",
+            json={
+                "class_name": "二（2）班",
+                "school": "水磨镇小学",
+                "region_key": "yunnan",
+                "grade": "二年级",
+                "class_no": "2",
+                "students": [{"name": "赵小明", "grade": "二年级", "avatar_seed": 1}],
+            },
+        )
+        assert create_response.status_code == 201
+        other_code = create_response.json()["class_code"]
+
+        token = _teacher_login()
+        # 让教师关联新班级
+        enter_other = client.post(
+            "/api/session/teacher/enter",
+            json={"class_code": other_code, "teacher_name": "王老师"},
+        )
+        assert enter_other.status_code == 200
+
+        switch_response = client.post(
+            "/api/session/teacher/switch",
+            json={"class_code": other_code},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert switch_response.status_code == 200
+        data = switch_response.json()
+        assert data["profile"]["class_code"] == other_code
+        assert data["profile"]["school"] == "水磨镇小学"
+        assert data["session_token"].startswith("st_")
+    finally:
+        Path(db_path).unlink(missing_ok=True)
+
+
+def test_teacher_switch_unlinked_class_returns_404(monkeypatch: MonkeyPatch) -> None:
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = tmp.name
+
+    monkeypatch.setattr(settings, "database_path", db_path)
+
+    try:
+        _seed_db(db_path)
+        token = _teacher_login()
+
+        response = client.post(
+            "/api/session/teacher/switch",
+            json={"class_code": "LTZ2024"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200  # LTZ2024 已关联
+
+        response = client.post(
+            "/api/session/teacher/switch",
+            json={"class_code": "NO_SUCH"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 404
+    finally:
+        Path(db_path).unlink(missing_ok=True)

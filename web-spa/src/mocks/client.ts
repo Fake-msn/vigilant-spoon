@@ -108,7 +108,49 @@ export const mockClient = {
         class_name: '三（1）班',
         school: '龙头山镇中心小学',
         region_key: region.key,
+        region_name: region.name,
       },
+      expires_at: new Date().toISOString(),
+    }
+  },
+
+  async getTeacherClasses() {
+    await delay(300)
+    return {
+      teacher_id: 'teacher-李老师',
+      name: '李老师',
+      school: '龙头山镇中心小学',
+      classes: [
+        {
+          class_code: 'LTZ2024',
+          class_name: '三（1）班',
+          school: '龙头山镇中心小学',
+          grade: '三年级',
+          class_no: '1',
+        },
+      ],
+    }
+  },
+
+  async teacherSwitch(classCode: string) {
+    await delay(300)
+    if (classCode !== 'LTZ2024') {
+      throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    const region = regions[0]
+    return {
+      session_token: `st_${classCode.padEnd(48, '0').slice(0, 48)}`,
+      profile: {
+        id: `teacher-李老师`,
+        name: '李老师',
+        role: 'teacher' as const,
+        class_code: classCode,
+        class_name: '三（1）班',
+        school: '龙头山镇中心小学',
+        region_key: region.key,
+        region_name: region.name,
+      },
+      expires_at: new Date().toISOString(),
     }
   },
 

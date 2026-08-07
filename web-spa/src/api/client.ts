@@ -128,7 +128,14 @@ export const realClient = {
     students: { id: string; name: string; student_no: string; grade: string; avatar_seed: number; role: string; region_key: string; region_name: string; ideal?: string }[]
   }>(`/classes/${encodeURIComponent(code)}`),
   enter: (code: string, studentName: string) => request<{ session_token: string; profile: Record<string, unknown> }>(`/session/enter`, { method: 'POST', body: JSON.stringify({ class_code: code, student_name: studentName }) }),
-  teacherEnter: (code: string, teacherName: string) => request<{ session_token: string; profile: Record<string, unknown> }>(`/session/teacher/enter`, { method: 'POST', body: JSON.stringify({ class_code: code, teacher_name: teacherName }) }),
+  teacherEnter: (code: string, teacherName: string) => request<{ session_token: string; profile: Record<string, unknown>; expires_at: string }>(`/session/teacher/enter`, { method: 'POST', body: JSON.stringify({ class_code: code, teacher_name: teacherName }) }),
+  getTeacherClasses: () => request<{
+    teacher_id: string
+    name: string
+    school: string
+    classes: { class_code: string; class_name: string; school: string; grade: string; class_no: string }[]
+  }>(`/session/teacher/classes`),
+  teacherSwitch: (classCode: string) => request<{ session_token: string; profile: Record<string, unknown>; expires_at: string }>(`/session/teacher/switch`, { method: 'POST', body: JSON.stringify({ class_code: classCode }) }),
   startClass: (code: string) => request<{ session_id: string; state: 'idle' | 'active' | 'paused'; current_student: string | null; current_slot: string | null; turn_count: number; updated_at: string }>(`/classes/${encodeURIComponent(code)}/session/start`, { method: 'POST' }),
   controlClass: (code: string, action: string, clientCmdId: string, payload?: Record<string, unknown>) => request<{ session_id: string; state: 'idle' | 'active' | 'paused'; current_student: string | null; current_slot: string | null; turn_count: number; updated_at: string }>(`/classes/${encodeURIComponent(code)}/session/control`, { method: 'POST', body: JSON.stringify({ action, client_cmd_id: clientCmdId, payload }) }),
   getClassStatus: (code: string) => request<{ session_id: string; state: 'idle' | 'active' | 'paused'; current_student: string | null; current_slot: string | null; turn_count: number; updated_at: string }>(`/classes/${encodeURIComponent(code)}/session/status`),

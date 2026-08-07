@@ -4,6 +4,7 @@ import { getSession, isAuthenticated, isStudentProfile } from '@/stores/session'
 import { SplashPage } from '@/pages/splash/SplashPage'
 import { LoginPage } from '@/pages/login/LoginPage'
 import { IdentityPage } from '@/pages/identity/IdentityPage'
+import { TeacherLoginPage } from '@/pages/teacher/login/TeacherLoginPage'
 import { StudentHomePage } from '@/pages/student/home/StudentHomePage'
 import { VoicePage } from '@/pages/student/voice/VoicePage'
 import { LetterListPage } from '@/pages/feedback/LetterListPage'
@@ -12,6 +13,7 @@ import { GrowthPage } from '@/pages/student/growth/GrowthPage'
 import { TeacherConsoleLayout } from '@/layouts/TeacherConsoleLayout'
 import { TeacherEntryPage } from '@/pages/teacher/entry/TeacherEntryPage'
 import { TeacherSetupPage } from '@/pages/teacher/setup/TeacherSetupPage'
+import { TeacherAccountPage } from '@/pages/teacher/account/TeacherAccountPage'
 import { TeacherLessonPage } from '@/pages/teacher/lesson/TeacherLessonPage'
 import { TeacherAcademicPage } from '@/pages/teacher/academic/TeacherAcademicPage'
 import { TeacherGrowthPage } from '@/pages/teacher/growth/TeacherGrowthPage'
@@ -70,6 +72,7 @@ export const routes: RouteObject[] = [
   { path: '/', element: <SplashPage /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/identity', element: <IdentityPage /> },
+  { path: '/teacher/login', element: <TeacherLoginPage /> },
   {
     element: <ProtectedLayout />,
     children: [
@@ -92,6 +95,7 @@ export const routes: RouteObject[] = [
             children: [
               { index: true, element: <TeacherEntryPage /> },
               { path: 'setup', element: <TeacherSetupPage /> },
+              { path: 'account', element: <TeacherAccountPage /> },
               { path: 'lesson', element: <TeacherLessonPage /> },
               { path: 'academic', element: <TeacherAcademicPage /> },
               { path: 'growth', element: <TeacherGrowthPage /> },

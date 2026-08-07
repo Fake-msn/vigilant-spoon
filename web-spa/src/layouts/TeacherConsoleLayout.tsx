@@ -1,7 +1,7 @@
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from '@/components/Icon'
 import { TeacherAvatar } from '@/components/art/TeacherAvatar'
-import { getSession, isStudentProfile } from '@/stores/session'
+import { clearSession, getSession, isStudentProfile } from '@/stores/session'
 
 const nav = [
   { href: '/teacher/lesson', icon: 'plus' as const, label: '新建课程', desc: '创设课堂语境' },
@@ -12,6 +12,7 @@ const nav = [
 
 export function TeacherConsoleLayout() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const { profile } = getSession()
 
   if (!profile || isStudentProfile(profile)) {
@@ -19,6 +20,11 @@ export function TeacherConsoleLayout() {
   }
 
   const { name, school, class_name } = profile
+
+  const logout = () => {
+    clearSession()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="relative mx-auto flex w-full max-w-[1760px] flex-col gap-6 px-6 py-7 lg:flex-row lg:px-10">
@@ -74,12 +80,28 @@ export function TeacherConsoleLayout() {
           </Link>
 
           <Link
+            to="/teacher/account"
+            className="mt-4 flex items-center gap-2 rounded-lg border border-dashed border-line px-4 py-3 text-ink-soft transition-colors hover:border-brand/40 hover:text-brand"
+          >
+            <Icon name="users" size={16} />
+            <span className="text-sm font-semibold">账号配置</span>
+          </Link>
+
+          <Link
             to="/admin"
             className="mt-2 flex items-center gap-2 rounded-lg border border-dashed border-line px-4 py-3 text-ink-soft transition-colors hover:border-brand/40 hover:text-brand"
           >
             <Icon name="settings" size={16} />
             <span className="text-sm font-semibold">系统配置</span>
           </Link>
+
+          <button
+            onClick={logout}
+            className="mt-2 flex items-center gap-2 rounded-lg border border-transparent px-4 py-3 text-ink-soft transition-colors hover:text-red-500"
+          >
+            <Icon name="logout" size={16} />
+            <span className="text-sm font-semibold">退出登录</span>
+          </button>
         </div>
       </aside>
 

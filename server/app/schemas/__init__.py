@@ -29,9 +29,12 @@ from app.schemas.session import (
     EnterResp,
     StudentCreate,
     StudentProfile,
+    TeacherClassesResp,
+    TeacherClassView,
     TeacherEnterReq,
     TeacherEnterResp,
     TeacherProfile,
+    TeacherSwitchReq,
 )
 from app.schemas.voice import (
     AudioChunkEvent,
@@ -83,6 +86,9 @@ __all__ = [
     "TeacherEnterReq",
     "TeacherEnterResp",
     "TeacherProfile",
+    "TeacherClassesResp",
+    "TeacherClassView",
+    "TeacherSwitchReq",
     "ClassCreateReq",
     "ClassCreateResp",
     "AudioChunkEvent",

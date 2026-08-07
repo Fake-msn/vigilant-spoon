@@ -130,3 +130,28 @@ class TeacherEnterResp(BaseModel):
     )
     profile: TeacherProfile = Field(..., description="教师 profile")
     expires_at: datetime = Field(..., description="token 过期时间")
+
+
+class TeacherClassView(BaseModel):
+    """教师账号下管理的单个班级。"""
+
+    class_code: str = Field(..., description="班级码")
+    class_name: str = Field(..., description="班级名称")
+    school: str = Field(..., description="学校")
+    grade: str = Field(..., description="年级")
+    class_no: str = Field(..., description="班级序号")
+
+
+class TeacherClassesResp(BaseModel):
+    """教师账号概览：教师本人信息 + 任教班级列表。"""
+
+    teacher_id: str = Field(..., description="教师唯一标识")
+    name: str = Field(..., description="教师姓名")
+    school: str = Field(..., description="当前班级学校")
+    classes: list[TeacherClassView] = Field(..., description="任教班级列表")
+
+
+class TeacherSwitchReq(BaseModel):
+    """教师在任教班级间切换当前班级。"""
+
+    class_code: str = Field(..., min_length=1, description="目标班级码")

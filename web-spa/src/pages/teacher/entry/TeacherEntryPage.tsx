@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Icon } from '@/components/Icon'
 import { TeacherAvatar } from '@/components/art/TeacherAvatar'
+import { clearSession } from '@/stores/session'
 
 const options = [
   {
@@ -18,6 +19,13 @@ const options = [
 ]
 
 export function TeacherEntryPage() {
+  const navigate = useNavigate()
+
+  const backToLogin = () => {
+    clearSession()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <div className="relative mx-auto max-w-4xl px-5 py-10">
       <img
@@ -26,13 +34,13 @@ export function TeacherEntryPage() {
         aria-hidden
         className="pointer-events-none absolute -right-40 -top-4 hidden w-80 opacity-70 lg:block"
       />
-      <Link
-        to="/login"
+      <button
+        onClick={backToLogin}
         className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft transition-colors hover:text-brand"
       >
         <Icon name="arrow-left" size={16} />
         返回登录
-      </Link>
+      </button>
       <div className="mt-4 text-center">
         <span className="mx-auto inline-flex items-center gap-2.5 rounded-full border border-line bg-white px-4 py-2 shadow-card">
           <TeacherAvatar size={28} />
