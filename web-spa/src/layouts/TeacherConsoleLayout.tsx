@@ -72,6 +72,14 @@ export function TeacherConsoleLayout() {
             <Icon name="arrow-left" size={13} />
             返回班级选择
           </Link>
+
+          <Link
+            to="/admin"
+            className="mt-2 flex items-center gap-2 rounded-lg border border-dashed border-line px-4 py-3 text-ink-soft transition-colors hover:border-brand/40 hover:text-brand"
+          >
+            <Icon name="settings" size={16} />
+            <span className="text-sm font-semibold">系统配置</span>
+          </Link>
         </div>
       </aside>
 

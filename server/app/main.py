@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -16,6 +17,7 @@ import app.schemas as schemas_module
 from app.db.migrate import ensure_migrated
 from app.routers import (
     academic,
+    admin,
     classes,
     classroom,
     growth,
@@ -27,6 +29,7 @@ from app.routers import (
 )
 from app.schemas import ErrorEnvelope, HealthCheck
 from app.schemas import __all__ as schemas_all
+from app.services.imagegen import static_dir
 
 
 @asynccontextmanager
@@ -135,3 +138,7 @@ app.include_router(lesson.router, prefix="/api")
 app.include_router(academic.router, prefix="/api")
 app.include_router(classroom.router, prefix="/api")
 app.include_router(voice_ws.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
+
+# 静态资源（班宠画像等）
+app.mount("/api/static", StaticFiles(directory=static_dir()), name="static")

@@ -17,6 +17,7 @@ import { TeacherAcademicPage } from '@/pages/teacher/academic/TeacherAcademicPag
 import { TeacherGrowthPage } from '@/pages/teacher/growth/TeacherGrowthPage'
 import { TeacherCoursesPage } from '@/pages/teacher/courses/TeacherCoursesPage'
 import { TeacherClassroomPage } from '@/pages/teacher/classroom/TeacherClassroomPage'
+import { AdminConfigPage } from '@/pages/admin/AdminConfigPage'
 
 function ProtectedLayout() {
   const location = useLocation()
@@ -100,6 +101,7 @@ export const routes: RouteObject[] = [
           },
         ],
       },
+      { path: '/admin', element: <AdminConfigPage /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

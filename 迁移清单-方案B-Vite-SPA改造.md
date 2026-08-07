@@ -310,6 +310,21 @@ P5  FE-M7  联调 + 视觉对照（@theme 令牌逐页走查）+ 全量回归
 - `api/client.ts` 统一封装：baseURL 走环境变量（`VITE_API_BASE`）、超时、错误规范化（业务码 → UI 文案）、token 注入；页面不直接 fetch。
 - **mock 开关**：`VITE_USE_MOCK=true` 时 client/ws 全部路由到 `src/mocks/`，保证后端未就绪时前端可独立开发与演示。
 
+**开发代理配置（vite.config.ts）——重要约束**：
+
+> 客户端 `API_BASE` 与 Vite 代理目标**必须解耦**，二者共用同一环境变量会引发请求路径丢失 `/api` 前缀的 bug。
+
+- **约定**：客户端 `API_BASE` 恒为**相对前缀** `/api`（`import.meta.env.VITE_API_BASE || '/api'`），页面请求最终形如 `/api/xxx`，由 Vite 代理转发到后端。
+- **代理目标**：由独立的 `VITE_PROXY_TARGET`（HTTP）与 `VITE_PROXY_TARGET_WS`（WebSocket）控制，默认 `http://localhost:8000` / `ws://localhost:8000`。
+- **正确用法**：本地后端不在 8000 时（例如 8001），只设代理目标，**不要**把 `VITE_API_BASE` 设成绝对 URL——
+  ```
+  $env:VITE_PROXY_TARGET='http://localhost:8001'
+  $env:VITE_PROXY_TARGET_WS='ws://localhost:8001'
+  npm run dev
+  ```
+- **曾踩坑**：若把 `VITE_API_BASE` 设为 `http://localhost:<port>`，`request()` 会拼出 `http://<host>/admin/login`（缺 `/api`），管理员登录/配置等接口全部 404，而默认代理模式（`/api`）下正常——表现为"同一套代码，换端口后接口集体失效"。
+- 该解耦已覆盖全部接口（含管理员后台 `/api/admin/*`），相对前缀下行为一致。
+
 ### 9.2 新旧系统"接口"映射关系
 
 旧系统没有 HTTP 接口，映射对象是**旧本地数据源与本地行为**：

@@ -1,5 +1,6 @@
 """Pydantic schemas for 小信 API (contract v2.1)."""
 
+from app.schemas.admin import AdminLoginReq, AdminLoginResp, ServiceConfig, ServiceConfigUpdate
 from app.schemas.classroom import (
     ClassroomStatus,
     ControlReq,
@@ -48,6 +49,8 @@ __all__ = [
     "AcademicRecord",
     "AcademicRecordInput",
     "AcademicSummary",
+    "AdminLoginReq",
+    "AdminLoginResp",
     "ClassInfo",
     "ClassPetView",
     "ClassroomStatus",
@@ -69,6 +72,8 @@ __all__ = [
     "Letter",
     "PetState",
     "ScoreCard",
+    "ServiceConfig",
+    "ServiceConfigUpdate",
     "StudentProfile",
     "SubjectScore",
     "TeacherEnterReq",

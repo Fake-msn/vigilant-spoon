@@ -16,7 +16,6 @@ from typing import Any
 
 import websockets
 
-from app.config import settings
 from app.db import get_db_connection
 from app.schemas.voice import (
     AudioChunkEvent,
@@ -31,6 +30,7 @@ from app.schemas.voice import (
     VoiceErrorEvent,
     VoiceMode,
 )
+from app.services import runtime_config
 
 logger = logging.getLogger("voice")
 
@@ -235,9 +235,10 @@ class DashScopeVoiceProvider(VoiceProvider):
 
     def __init__(self, ctx: VoiceContext) -> None:
         self.ctx = ctx
-        self._api_key = settings.dashscope_api_key or ""
+        self._api_key = runtime_config.get("dashscope_api_key")
         self._url = (
-            f"{settings.dashscope_realtime_url}?model={settings.voice_model}"
+            f"{runtime_config.get('dashscope_realtime_url')}"
+            f"?model={runtime_config.get('voice_model')}"
         )
         self._queue: asyncio.Queue[ServerVoiceEvent] = asyncio.Queue()
         self._ws: Any = None
@@ -360,6 +361,6 @@ class DashScopeVoiceProvider(VoiceProvider):
 
 
 def create_voice_provider(ctx: VoiceContext) -> VoiceProvider:
-    if settings.voice_provider == "dashscope":
+    if runtime_config.get("voice_provider") == "dashscope":
         return DashScopeVoiceProvider(ctx)
     return LocalVoiceProvider(ctx)

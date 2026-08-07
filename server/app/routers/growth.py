@@ -13,6 +13,7 @@ from app.db import get_db_connection
 from app.deps import CurrentUser, get_current_user
 from app.schemas import Commitment, GrowthView, JobRef, PetState
 from app.schemas.common import ErrorEnvelope
+from app.services import imagegen
 
 router = APIRouter(prefix="/students", tags=["growth"])
 
@@ -173,7 +174,17 @@ def create_portrait(
             job_id = f"portrait-{student_id}-{idempotency_key[:16]}"
 
         now = datetime.now(timezone.utc).isoformat()
-        result_url = f"/static/portraits/{student_id}.png"
+        result_url = f"/api/static/portraits/{student_id}.png"
+
+        # 生成画像文件（placeholder 落盘 / dashscope 真实文生图），并回写 DB
+        out_path = imagegen.portraits_dir() / f"{student_id}.png"
+        prompt = imagegen.build_prompt(
+            {"ideal": row["ideal"], "species": row["species"]}
+        )
+        imagegen.generate_portrait(
+            prompt, out_path, seed=abs(hash(student_id)) % 4
+        )
+
         conn.execute(
             """
             INSERT OR REPLACE INTO jobs (

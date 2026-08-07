@@ -51,6 +51,53 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await res.json()) as T
 }
 
+export type ServiceConfig = {
+  voice_provider: string
+  dashscope_api_key: string
+  dashscope_realtime_url: string
+  voice_model: string
+  text_provider: string
+  text_model: string
+  text_base_url: string
+  text_api_key: string
+  image_provider: string
+  image_model: string
+  image_base_url: string
+  image_api_key: string
+}
+
+// 管理员会话独立存储（与学生/教师 token 互不影响）
+const ADMIN_TOKEN_KEY = 'admin_token'
+export function getAdminToken(): string | null {
+  if (typeof localStorage === 'undefined') return null
+  return localStorage.getItem(ADMIN_TOKEN_KEY)
+}
+export function setAdminToken(token: string | null): void {
+  if (typeof localStorage === 'undefined') return
+  if (token) localStorage.setItem(ADMIN_TOKEN_KEY, token)
+  else localStorage.removeItem(ADMIN_TOKEN_KEY)
+}
+
+async function adminRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const url = `${API_BASE}${path}`
+  const headers = new Headers(init.headers)
+  const token = getAdminToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  headers.set('Content-Type', 'application/json')
+
+  const res = await fetch(url, { ...init, headers })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    const code = body.code || 'UNKNOWN'
+    if (res.status === 401) {
+      setAdminToken(null)
+      throw new ApiClientError(body.message || '管理员登录已失效', res.status, code)
+    }
+    throw new ApiClientError(body.message || res.statusText, res.status, code)
+  }
+  return (await res.json()) as T
+}
+
 export const realClient = {
   getClass: (code: string) => request<{
     class_code: string
@@ -223,6 +270,19 @@ export const realClient = {
       return fd
     })(),
   }),
+
+  // 方案 5.3 管理员后台
+  adminLogin: async (password: string) => {
+    const resp = await adminRequest<{ session_token: string; expires_at: string }>('/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    })
+    setAdminToken(resp.session_token)
+    return resp
+  },
+  getAdminConfig: () => adminRequest<ServiceConfig>('/admin/config'),
+  updateAdminConfig: (config: Partial<ServiceConfig>) =>
+    adminRequest<ServiceConfig>('/admin/config', { method: 'PUT', body: JSON.stringify(config) }),
 }
 
 export const api = USE_MOCK ? mockClient : realClient

@@ -6,9 +6,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
+
+from app.services.llm import chat_completion
+
+logger = logging.getLogger("letter")
 
 
 @dataclass(frozen=True)
@@ -76,8 +81,48 @@ def _care_paragraph(ctx: LetterContext) -> list[str]:
     return lines
 
 
+def _generate_with_llm(ctx: LetterContext) -> GeneratedLetter | None:
+    """尝试用 LLM 生成信件；未配置 / 解析失败时返回 None 以回退模板。"""
+    system = (
+        "你是「小信」，一位小学思政课 AI 伙伴。请根据学生档案写一封温暖、鼓励的周来信。"
+        "只输出 JSON，不要输出任何额外文字。格式："
+        '{"title": "标题", "body": ["第一段", "第二段", ...]}'
+    )
+    needs_care = ctx.state == "gray" or ctx.needs_care
+    user = (
+        f"学生：{ctx.school}{ctx.grade}的{ctx.student_name}。\n"
+        f"理想：{ctx.ideal or '未知'}。\n"
+        f"最近谈心：{ctx.last_gist or '无'}。\n"
+        f"承诺：{_format_commitments(ctx.commitments)}\n"
+        f"需要关怀：{'是' if needs_care else '否'}"
+        + (f"。老师信号：{ctx.signal}" if ctx.signal else "。")
+        + "\n请写一封 3-5 段的信，语气温暖鼓励；若需关怀则包含安慰与支持。"
+    )
+    text = chat_completion(system, user, max_tokens=800)
+    if not text:
+        return None
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        logger.warning("LLM 信件输出非 JSON，回退模板")
+        return None
+    title = str(data.get("title", "")).strip()
+    body = [str(x).strip() for x in data.get("body", []) if str(x).strip()]
+    if not title or not body:
+        logger.warning("LLM 信件输出缺 title/body，回退模板")
+        return None
+    preview = body[0]
+    if len(preview) > 60:
+        preview = preview[:57] + "…"
+    return GeneratedLetter(title=title, preview=preview, body=body, source="llm")
+
+
 def generate_letter(ctx: LetterContext) -> GeneratedLetter:
-    """基于成长档案生成一封周来信。"""
+    """基于成长档案生成一封周来信。优先 LLM，未配置时回退模板。"""
+    llm = _generate_with_llm(ctx)
+    if llm is not None:
+        return llm
+
     topic = _pick_last_topic(ctx.history)
     commitment_line = _format_commitments(ctx.commitments)
 

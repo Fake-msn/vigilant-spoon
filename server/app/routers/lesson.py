@@ -14,6 +14,7 @@ from app.db import get_db_connection
 from app.deps import CurrentUser, get_current_user
 from app.schemas import LessonGenReq, LessonMaterial, LessonPlan, LessonSummary
 from app.schemas.common import ErrorEnvelope
+from app.services.llm import chat_completion
 
 router = APIRouter(tags=["lessons"])
 
@@ -91,6 +92,53 @@ def _build_summary(row: sqlite3.Row) -> LessonSummary:
     )
 
 
+def _template_materials(req: LessonGenReq) -> list[LessonMaterial]:
+    materials: list[LessonMaterial] = [
+        LessonMaterial(
+            title="开场素材",
+            content=f"围绕「{req.topic}」创设语境，引导学生说出具体理想。",
+        )
+    ]
+    if req.guidance:
+        materials.append(LessonMaterial(title="引导策略", content=req.guidance))
+    for goal in req.goals:
+        materials.append(LessonMaterial(title="教学目标", content=goal))
+    return materials
+
+
+def _llm_materials(req: LessonGenReq) -> list[LessonMaterial] | None:
+    """尝试用 LLM 生成备课素材；未配置 / 解析失败时返回 None 以回退模板。"""
+    goals_text = "；".join(req.goals) if req.goals else "（未指定）"
+    system = (
+        "你是「小信」的备课助手。根据课程主题与教学目标生成一份教案素材，"
+        "只输出 JSON，不要输出任何额外文字。格式："
+        '{"materials": [{"title": "素材标题", "content": "素材内容"}, ...]}'
+        "其中应包含开场素材、引导策略、教学目标等 3-5 条素材。"
+    )
+    user = (
+        f"课程主题：{req.topic}\n"
+        f"教学目标：{goals_text}\n"
+        f"引导策略：{req.guidance or '（未指定）'}"
+    )
+    text = chat_completion(system, user, max_tokens=900)
+    if not text:
+        return None
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    items = data.get("materials", [])
+    materials = [
+        LessonMaterial(
+            title=str(m.get("title", "")).strip(),
+            content=str(m.get("content", "")).strip(),
+        )
+        for m in items
+        if isinstance(m, dict) and m.get("title") and m.get("content")
+    ]
+    return materials or None
+
+
 @router.post("/lesson/generate", response_model=LessonPlan)
 def generate_lesson(
     req: LessonGenReq, user: CurrentUser = Depends(get_current_user)
@@ -104,27 +152,9 @@ def generate_lesson(
     duration = "40 分钟"
     traces = ["课程已创建，等待课堂开启"]
 
-    materials: list[LessonMaterial] = []
-    materials.append(
-        LessonMaterial(
-            title="开场素材",
-            content=f"围绕「{req.topic}」创设语境，引导学生说出具体理想。",
-        )
-    )
-    if req.guidance:
-        materials.append(
-            LessonMaterial(
-                title="引导策略",
-                content=req.guidance,
-            )
-        )
-    for goal in req.goals:
-        materials.append(
-            LessonMaterial(
-                title="教学目标",
-                content=goal,
-            )
-        )
+    materials = _llm_materials(req)
+    if materials is None:
+        materials = _template_materials(req)
 
     primary_goal = req.goals[0] if req.goals else req.topic
 

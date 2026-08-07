@@ -4,6 +4,8 @@ import type { Profile } from '@/stores/session'
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+const ADMIN_PASSWORD = 'admin123'
+
 export const mockClient = {
   async getClass(code: string) {
     await delay(300)
@@ -322,5 +324,35 @@ export const mockClient = {
         updated_at: new Date().toISOString(),
       },
     }))
+  },
+
+  // 方案 5.3 管理员后台（mock：内存态）
+  async adminLogin(password: string) {
+    await delay(300)
+    if (password !== ADMIN_PASSWORD) {
+      throw new ApiClientError('管理员密码错误', 401, 'INVALID_PASSWORD')
+    }
+    return { session_token: `ad_mock${Date.now().toString(36)}`, expires_at: new Date().toISOString() }
+  },
+  async getAdminConfig() {
+    await delay(300)
+    return {
+      voice_provider: 'local',
+      dashscope_api_key: '',
+      dashscope_realtime_url: 'wss://dashscope.aliyuncs.com/api-ws/v1/realtime',
+      voice_model: 'qwen3.5-omni-flash-realtime',
+      text_provider: 'template',
+      text_model: 'qwen-plus',
+      text_base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      text_api_key: '',
+      image_provider: 'placeholder',
+      image_model: 'wanx2.1-t2i-turbo',
+      image_base_url: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image',
+      image_api_key: '',
+    }
+  },
+  async updateAdminConfig() {
+    await delay(300)
+    return this.getAdminConfig()
   },
 }

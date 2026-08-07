@@ -11,3 +11,7 @@ __pycache__/
 *.pyc
 .next/
 coverage/
+# 运行时生成的静态资源（班宠画像等）
+server/app/static/
+# 运行时本地数据库（可随时 seed 重建）
+server/data/

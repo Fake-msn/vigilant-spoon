@@ -105,3 +105,32 @@ def get_current_user(
         raise _unauthorized("TOKEN_INVALID", "登录已失效，请重新进入")
     finally:
         conn.close()
+
+
+def get_current_admin(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> str:
+    """Validate Bearer token against the admin_sessions table."""
+    if credentials is None:
+        raise _unauthorized("TOKEN_INVALID", "登录已失效，请重新进入")
+
+    token = credentials.credentials
+    if not token.startswith("ad_"):
+        raise _unauthorized("TOKEN_INVALID", "登录已失效，请重新进入")
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute(
+            "SELECT token, expires_at FROM admin_sessions WHERE token = ?",
+            (token,),
+        ).fetchone()
+        if row is None:
+            raise _unauthorized("TOKEN_INVALID", "登录已失效，请重新进入")
+
+        expires_at = datetime.fromisoformat(row["expires_at"])
+        if datetime.now(timezone.utc) > expires_at:
+            raise _unauthorized("TOKEN_EXPIRED", "登录已过期，请重新进入")
+
+        return str(token)
+    finally:
+        conn.close()
