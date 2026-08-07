@@ -114,10 +114,11 @@ class EnterResp(BaseModel):
 
 
 class TeacherEnterReq(BaseModel):
-    """教师演示登录请求（无密码）"""
+    """教师登录请求（可选密码）"""
 
     class_code: str = Field(..., min_length=1, description="班级码")
     teacher_name: str = Field(default="李老师", min_length=1, description="教师姓名")
+    password: str | None = Field(default=None, description="密码（账号设置了密码时必填）")
 
 
 class TeacherEnterResp(BaseModel):
@@ -155,3 +156,74 @@ class TeacherSwitchReq(BaseModel):
     """教师在任教班级间切换当前班级。"""
 
     class_code: str = Field(..., min_length=1, description="目标班级码")
+
+
+class TeacherRegisterReq(BaseModel):
+    """教师注册请求：必填姓名，个人信息与密码可选。"""
+
+    name: str = Field(..., min_length=1, max_length=50, description="教师姓名")
+    school: str = Field(default="", max_length=100, description="学校（可选）")
+    phone: str = Field(default="", max_length=30, description="联系电话（可选）")
+    subject: str = Field(default="", max_length=50, description="任教学科（可选）")
+    title: str = Field(default="", max_length=30, description="职称（可选）")
+    password: str | None = Field(
+        default=None, max_length=64, description="登录密码（可选，设置后登录需校验）"
+    )
+
+
+class TeacherAccount(BaseModel):
+    """教师账号信息（个人设置）。"""
+
+    teacher_id: str = Field(..., description="教师唯一标识")
+    name: str = Field(..., description="教师姓名")
+    school: str = Field(default="", description="学校")
+    phone: str = Field(default="", description="联系电话")
+    subject: str = Field(default="", description="任教学科")
+    title: str = Field(default="", description="职称")
+    has_password: bool = Field(..., description="是否已设置密码")
+    status: Literal["pending", "active", "rejected"] = Field(
+        default="active", description="账号审核状态"
+    )
+
+
+class PendingTeacherReview(BaseModel):
+    """管理员审核列表中的待审教师条目。"""
+
+    teacher_id: str = Field(..., description="教师唯一标识")
+    name: str = Field(..., description="教师姓名")
+    school: str = Field(default="", description="学校")
+    phone: str = Field(default="", description="联系电话")
+    subject: str = Field(default="", description="任教学科")
+    title: str = Field(default="", description="职称")
+    created_at: str = Field(default="", description="注册时间")
+
+
+class PendingTeacherReviewList(BaseModel):
+    """待管理员审核的教师注册列表。"""
+
+    items: list[PendingTeacherReview] = Field(default_factory=list, description="待审教师列表")
+
+
+class TeacherReviewReq(BaseModel):
+    """管理员审核教师注册请求。"""
+
+    approve: bool = Field(..., description="是否通过")
+    reject_reason: str | None = Field(
+        default=None, max_length=200, description="驳回原因（驳回时可选）"
+    )
+
+
+class TeacherAccountUpdateReq(BaseModel):
+    """更新教师个人信息（均可选）。"""
+
+    school: str | None = Field(default=None, max_length=100, description="学校")
+    phone: str | None = Field(default=None, max_length=30, description="联系电话")
+    subject: str | None = Field(default=None, max_length=50, description="任教学科")
+    title: str | None = Field(default=None, max_length=30, description="职称")
+
+
+class TeacherPasswordUpdateReq(BaseModel):
+    """设置 / 修改教师密码（可选）。"""
+
+    old_password: str | None = Field(default=None, description="旧密码（已设置密码时必填）")
+    new_password: str = Field(..., min_length=4, max_length=64, description="新密码")

@@ -5,6 +5,7 @@ import { SplashPage } from '@/pages/splash/SplashPage'
 import { LoginPage } from '@/pages/login/LoginPage'
 import { IdentityPage } from '@/pages/identity/IdentityPage'
 import { TeacherLoginPage } from '@/pages/teacher/login/TeacherLoginPage'
+import { TeacherRegisterPage } from '@/pages/teacher/register/TeacherRegisterPage'
 import { StudentHomePage } from '@/pages/student/home/StudentHomePage'
 import { VoicePage } from '@/pages/student/voice/VoicePage'
 import { LetterListPage } from '@/pages/feedback/LetterListPage'
@@ -73,6 +74,7 @@ export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
   { path: '/identity', element: <IdentityPage /> },
   { path: '/teacher/login', element: <TeacherLoginPage /> },
+  { path: '/teacher/register', element: <TeacherRegisterPage /> },
   {
     element: <ProtectedLayout />,
     children: [

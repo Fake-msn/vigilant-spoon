@@ -1,11 +1,14 @@
-"""管理员后台：模型服务配置管理（方案 5.3）。
+"""管理员后台：模型服务配置管理与教师注册审批（方案 5.3）。
 
 - `POST /admin/login`：管理员密码登录，签发 `ad_` token。
 - `GET /admin/config`：读取当前生效配置（env 默认 + DB 覆盖）。
 - `PUT /admin/config`：部分更新模型配置。
+- `GET /admin/teachers/pending`：待审核教师注册列表。
+- `POST /admin/teachers/{teacher_id}/review`：通过 / 驳回教师注册。
 """
 
 import secrets
+import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,8 +19,11 @@ from app.deps import get_current_admin
 from app.schemas import (
     AdminLoginReq,
     AdminLoginResp,
+    PendingTeacherReview,
+    PendingTeacherReviewList,
     ServiceConfig,
     ServiceConfigUpdate,
+    TeacherReviewReq,
 )
 from app.schemas.common import ErrorEnvelope
 from app.services import runtime_config
@@ -75,3 +81,85 @@ def update_config(
     """部分更新模型服务配置，未提供的字段保持不变。"""
     values = {k: v for k, v in update.model_dump().items() if v is not None}
     return ServiceConfig(**runtime_config.set_config(values))
+
+
+def _as_str(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    return str(value)
+
+
+def _pending_teacher_not_found(teacher_id: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=ErrorEnvelope(
+            code="PENDING_TEACHER_NOT_FOUND",
+            message="待审教师不存在或已处理",
+            details={"teacher_id": teacher_id},
+        ).model_dump(),
+    )
+
+
+def _row_to_review(row: sqlite3.Row) -> PendingTeacherReview:
+    return PendingTeacherReview(
+        teacher_id=_as_str(row["teacher_id"]),
+        name=_as_str(row["name"]),
+        school=_as_str(row["school"]),
+        phone=_as_str(row["phone"]),
+        subject=_as_str(row["subject"]),
+        title=_as_str(row["title"]),
+        created_at=_as_str(row["created_at"]),
+    )
+
+
+@router.get("/teachers/pending", response_model=PendingTeacherReviewList)
+def list_pending_teachers(_admin: str = Depends(get_current_admin)) -> PendingTeacherReviewList:
+    """列出所有待管理员审核的教师注册。"""
+    conn = get_db_connection()
+    try:
+        rows = conn.execute(
+            "SELECT teacher_id, name, school, phone, subject, title, created_at "
+            "FROM teachers WHERE status = 'pending' ORDER BY created_at DESC"
+        ).fetchall()
+        return PendingTeacherReviewList(items=[_row_to_review(r) for r in rows])
+    finally:
+        conn.close()
+
+
+@router.post("/teachers/{teacher_id}/review", response_model=PendingTeacherReviewList)
+def review_teacher(
+    teacher_id: str,
+    req: TeacherReviewReq,
+    _admin: str = Depends(get_current_admin),
+) -> PendingTeacherReviewList:
+    """管理员审核教师注册：通过或驳回。"""
+    conn = get_db_connection()
+    try:
+        row = conn.execute(
+            "SELECT teacher_id FROM teachers WHERE teacher_id = ? AND status = 'pending'",
+            (teacher_id,),
+        ).fetchone()
+        if row is None:
+            raise _pending_teacher_not_found(teacher_id)
+
+        if req.approve:
+            conn.execute(
+                "UPDATE teachers SET status = 'active', reject_reason = NULL WHERE teacher_id = ?",
+                (teacher_id,),
+            )
+        else:
+            conn.execute(
+                "UPDATE teachers SET status = 'rejected', reject_reason = ? WHERE teacher_id = ?",
+                (req.reject_reason or "", teacher_id),
+            )
+        conn.commit()
+
+        rows = conn.execute(
+            "SELECT teacher_id, name, school, phone, subject, title, created_at "
+            "FROM teachers WHERE status = 'pending' ORDER BY created_at DESC"
+        ).fetchall()
+        return PendingTeacherReviewList(items=[_row_to_review(r) for r in rows])
+    finally:
+        conn.close()

@@ -231,6 +231,21 @@ def test_auth_expired_token_returns_401_expired(monkeypatch: MonkeyPatch) -> Non
 
 
 def _teacher_login() -> str:
+    # 先注册再登录（未注册教师登录会被校验拦截）
+    register_response = client.post(
+        "/api/session/teacher/register",
+        json={"name": "王老师", "school": "龙头山镇中心小学"},
+    )
+    assert register_response.status_code == 200
+    # 新注册账号为 pending，需管理员审批通过后才能登录
+    conn = sqlite3.connect(settings.database_path)
+    try:
+        conn.execute(
+            "UPDATE teachers SET status = 'active' WHERE teacher_id = 'teacher-王老师'"
+        )
+        conn.commit()
+    finally:
+        conn.close()
     response = client.post(
         "/api/session/teacher/enter",
         json={"class_code": "LTZ2024", "teacher_name": "王老师"},

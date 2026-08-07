@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '@/api/client'
-import { getAdminToken, setAdminToken, type ServiceConfig } from '@/api/client'
+import { getAdminToken, setAdminToken, type PendingTeacher, type ServiceConfig } from '@/api/client'
 import { Icon } from '@/components/Icon'
 
 const EMPTY_CONFIG: ServiceConfig = {
@@ -105,6 +105,121 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
     </div>
+  )
+}
+
+function TeacherReviewSection() {
+  const [pending, setPending] = useState<PendingTeacher[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [rejecting, setRejecting] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const resp = await api.getPendingTeachers()
+      setPending(resp.items)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '加载待审教师失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const approve = async (item: PendingTeacher) => {
+    setError('')
+    try {
+      const resp = await api.reviewTeacher(item.teacher_id, { approve: true })
+      setPending(resp.items)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '操作失败')
+    }
+  }
+
+  const reject = async (item: PendingTeacher) => {
+    setError('')
+    setRejecting(item.teacher_id)
+    try {
+      const resp = await api.reviewTeacher(item.teacher_id, {
+        approve: false,
+        reject_reason: rejectReason.trim() || undefined,
+      })
+      setPending(resp.items)
+      setRejectReason('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '操作失败')
+    } finally {
+      setRejecting(null)
+    }
+  }
+
+  return (
+    <section className="card p-6 md:p-7">
+      <div className="flex items-center gap-3">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-white text-sm font-bold">★</span>
+        <div>
+          <h2 className="text-base font-bold text-ink">教师注册审批</h2>
+          <p className="text-[12px] text-ink-soft">新注册的教师账号需通过审核后方可登录班级</p>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        {loading ? (
+          <p className="text-sm text-ink-soft">加载待审教师中…</p>
+        ) : pending.length === 0 ? (
+          <p className="rounded-xl bg-brand-soft/50 px-4 py-6 text-center text-sm text-ink-soft">
+            暂无待审核的教师注册
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {pending.map((item) => (
+              <div key={item.teacher_id} className="rounded-xl border border-line p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-ink">{item.name}</p>
+                    <p className="mt-0.5 text-[12px] text-ink-soft">
+                      {[item.school, item.subject, item.title, item.phone].filter(Boolean).join(' · ') || '未填写其他信息'}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-ink-faint">注册时间：{new Date(item.created_at).toLocaleString()}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => approve(item)}
+                      className="btn-brand !px-4 !py-2 text-sm"
+                    >
+                      <Icon name="check" size={14} />
+                      通过
+                    </button>
+                    <button
+                      onClick={() => reject(item)}
+                      disabled={rejecting === item.teacher_id}
+                      className="btn-line !px-4 !py-2 text-sm text-red-600"
+                    >
+                      <Icon name="logout" size={14} />
+                      驳回
+                    </button>
+                  </div>
+                </div>
+                <input
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="驳回原因（可选）"
+                  className="input-soft mt-3 !py-2 text-sm"
+                  aria-label="驳回原因"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        {error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}
+      </div>
+    </section>
   )
 }
 
@@ -263,6 +378,10 @@ export function AdminConfigPage() {
                 <input type="password" value={config.image_api_key} onChange={(e) => set('image_api_key', e.target.value)} placeholder="留空则回退占位图" className="input-soft" />
               </Field>
             </Section>
+          </div>
+
+          <div className="mt-5 animate-rise">
+            <TeacherReviewSection />
           </div>
 
           <div className="mt-6 flex flex-col items-end gap-2">

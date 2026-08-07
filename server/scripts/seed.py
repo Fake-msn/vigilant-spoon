@@ -641,6 +641,8 @@ def clear_tables(conn: sqlite3.Connection) -> None:
         DELETE FROM jobs;
         DELETE FROM teacher_sessions;
         DELETE FROM sessions;
+        DELETE FROM teacher_classes;
+        DELETE FROM teachers;
         DELETE FROM letters;
         DELETE FROM courses;
         DELETE FROM growth_records;
@@ -872,8 +874,40 @@ def seed(conn: sqlite3.Connection) -> None:
         ),
         )
 
+    logger.info("开始写入演示教师账号")
+    seed_teacher(conn)
+
     conn.commit()
     logger.info("数据库写入完成")
+
+
+def seed_teacher(conn: sqlite3.Connection) -> None:
+    """写入演示教师账号：李老师（默认未设密码）+ 关联班级。"""
+    teacher_id = "teacher-李老师"
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO teachers (
+            teacher_id, name, school, phone, subject, title, password_hash
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            teacher_id,
+            "李老师",
+            CLASS["school"],
+            "",
+            "道德与法治",
+            "一级教师",
+            None,
+        ),
+    )
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO teacher_classes (teacher_id, class_code)
+        VALUES (?, ?)
+        """,
+        (teacher_id, CLASS["class_code"]),
+    )
 
 
 def verify(conn: sqlite3.Connection) -> None:

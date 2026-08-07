@@ -6,6 +6,12 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const ADMIN_PASSWORD = 'admin123'
 
+// 已注册教师账号（演示：李老师默认已通过审核且未设密码；新注册账号待管理员审核）
+// status: pending（待审核）/ active（已通过）/ rejected（已驳回）
+const mockTeachers: { name: string; school: string; phone: string; subject: string; title: string; password_hash: string | null; status: 'pending' | 'active' | 'rejected' }[] = [
+  { name: '李老师', school: '龙头山镇中心小学', phone: '', subject: '道德与法治', title: '一级教师', password_hash: null, status: 'active' },
+]
+
 export const mockClient = {
   async createClass(req: {
     class_name: string
@@ -92,10 +98,23 @@ export const mockClient = {
     }
   },
 
-  async teacherEnter(code: string, teacherName: string) {
+  async teacherEnter(code: string, teacherName: string, password?: string) {
     await delay(300)
     if (code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    }
+    const account = mockTeachers.find((t) => t.name === teacherName)
+    if (!account) {
+      throw new ApiClientError('该教师尚未注册，请先完成账号注册', 404, 'TEACHER_NOT_REGISTERED')
+    }
+    if (account.status === 'pending') {
+      throw new ApiClientError('该教师账号正在等待管理员审核，暂无法登录', 403, 'TEACHER_PENDING_REVIEW')
+    }
+    if (account.status === 'rejected') {
+      throw new ApiClientError('该教师账号已被驳回', 403, 'TEACHER_REJECTED')
+    }
+    if (account.password_hash && account.password_hash !== password) {
+      throw new ApiClientError('密码不正确', 401, 'WRONG_PASSWORD')
     }
     const region = regions[0]
     return {
@@ -106,11 +125,108 @@ export const mockClient = {
         role: 'teacher' as const,
         class_code: code,
         class_name: '三（1）班',
-        school: '龙头山镇中心小学',
+        school: account.school || '龙头山镇中心小学',
         region_key: region.key,
         region_name: region.name,
       },
       expires_at: new Date().toISOString(),
+    }
+  },
+
+  async teacherRegister(req: {
+    name: string
+    school?: string
+    phone?: string
+    subject?: string
+    title?: string
+    password?: string
+  }) {
+    await delay(300)
+    const name = req.name.trim()
+    if (mockTeachers.some((t) => t.name === name)) {
+      throw new ApiClientError('该教师姓名已被注册', 409, 'TEACHER_EXISTS')
+    }
+    const account = {
+      name,
+      school: (req.school || '').trim(),
+      phone: (req.phone || '').trim(),
+      subject: (req.subject || '').trim(),
+      title: (req.title || '').trim(),
+      password_hash: req.password || null,
+      status: 'pending' as const,
+    }
+    mockTeachers.push(account)
+    return {
+      teacher_id: `teacher-${name}`,
+      name,
+      school: account.school,
+      phone: account.phone,
+      subject: account.subject,
+      title: account.title,
+      has_password: !!account.password_hash,
+      status: account.status,
+    }
+  },
+
+  async getTeacherAccount() {
+    await delay(200)
+    const name = '李老师'
+    const account = mockTeachers.find((t) => t.name === name)
+    return {
+      teacher_id: `teacher-${name}`,
+      name,
+      school: account?.school || '',
+      phone: account?.phone || '',
+      subject: account?.subject || '',
+      title: account?.title || '',
+      has_password: !!account?.password_hash,
+      status: account?.status || 'active',
+    }
+  },
+
+  async updateTeacherAccount(req: {
+    school?: string | null
+    phone?: string | null
+    subject?: string | null
+    title?: string | null
+  }) {
+    await delay(200)
+    const name = '李老师'
+    const account = mockTeachers.find((t) => t.name === name)
+    if (account) {
+      if (req.school !== undefined) account.school = req.school || ''
+      if (req.phone !== undefined) account.phone = req.phone || ''
+      if (req.subject !== undefined) account.subject = req.subject || ''
+      if (req.title !== undefined) account.title = req.title || ''
+    }
+    return {
+      teacher_id: `teacher-${name}`,
+      name,
+      school: account?.school || req.school || '',
+      phone: account?.phone || req.phone || '',
+      subject: account?.subject || req.subject || '',
+      title: account?.title || req.title || '',
+      has_password: !!account?.password_hash,
+      status: account?.status || 'active',
+    }
+  },
+
+  async updateTeacherPassword(req: { old_password?: string | null; new_password: string }) {
+    await delay(200)
+    const name = '李老师'
+    const account = mockTeachers.find((t) => t.name === name)
+    if (account?.password_hash && account.password_hash !== req.old_password) {
+      throw new ApiClientError('密码不正确', 401, 'WRONG_PASSWORD')
+    }
+    if (account) account.password_hash = req.new_password
+    return {
+      teacher_id: `teacher-${name}`,
+      name,
+      school: account?.school || '',
+      phone: account?.phone || '',
+      subject: account?.subject || '',
+      title: account?.title || '',
+      has_password: true,
     }
   },
 
@@ -473,5 +589,30 @@ export const mockClient = {
   async updateAdminConfig() {
     await delay(300)
     return this.getAdminConfig()
+  },
+  async getPendingTeachers() {
+    await delay(300)
+    return {
+      items: mockTeachers
+        .filter((t) => t.status === 'pending')
+        .map((t) => ({
+          teacher_id: `teacher-${t.name}`,
+          name: t.name,
+          school: t.school,
+          phone: t.phone,
+          subject: t.subject,
+          title: t.title,
+          created_at: new Date().toISOString(),
+        })),
+    }
+  },
+  async reviewTeacher(teacherId: string, req: { approve: boolean; reject_reason?: string }) {
+    await delay(300)
+    const name = teacherId.replace(/^teacher-/, '')
+    const account = mockTeachers.find((t) => t.name === name)
+    if (account) {
+      account.status = req.approve ? 'active' : 'rejected'
+    }
+    return this.getPendingTeachers()
   },
 }

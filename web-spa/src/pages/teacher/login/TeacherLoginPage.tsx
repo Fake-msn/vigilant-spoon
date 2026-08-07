@@ -9,6 +9,7 @@ export function TeacherLoginPage() {
   const { profile } = getSession()
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -22,7 +23,7 @@ export function TeacherLoginPage() {
     setError(null)
     setLoading(true)
     try {
-      const res = await api.teacherEnter(code.trim(), name.trim())
+      const res = await api.teacherEnter(code.trim(), name.trim(), password || undefined)
       setSession({ token: res.session_token, profile: res.profile as never })
       navigate('/teacher', { replace: true })
     } catch (e) {
@@ -64,6 +65,17 @@ export function TeacherLoginPage() {
               className="input-soft !pl-11 uppercase tracking-widest"
             />
           </div>
+          <div className="relative">
+            <Icon name="settings" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint" />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="登录密码（未设置可留空）"
+              aria-label="登录密码"
+              className="input-soft !pl-11"
+            />
+          </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
           <button
             onClick={submit}
@@ -75,10 +87,16 @@ export function TeacherLoginPage() {
           </button>
         </div>
 
-        <Link to="/login" className="mt-6 inline-flex items-center gap-1.5 text-sm text-ink-soft hover:text-brand">
-          <Icon name="arrow-left" size={16} />
-          返回角色选择
-        </Link>
+        <div className="mt-5 flex items-center justify-center gap-5 text-sm">
+          <Link to="/teacher/register" className="inline-flex items-center gap-1.5 text-brand hover:underline">
+            <Icon name="plus" size={16} />
+            还没有账号？去注册
+          </Link>
+          <Link to="/login" className="inline-flex items-center gap-1.5 text-ink-soft hover:text-brand">
+            <Icon name="arrow-left" size={16} />
+            返回角色选择
+          </Link>
+        </div>
       </div>
     </div>
   )
