@@ -24,6 +24,7 @@ from app.routers import (
     jobs,
     lesson,
     letters,
+    points,
     session,
     voice_ws,
 )
@@ -137,6 +138,7 @@ app.include_router(letters.router, prefix="/api")
 app.include_router(lesson.router, prefix="/api")
 app.include_router(academic.router, prefix="/api")
 app.include_router(classroom.router, prefix="/api")
+app.include_router(points.router, prefix="/api")
 app.include_router(voice_ws.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 

@@ -60,6 +60,7 @@ select = [
 "app/routers/lesson.py" = ["B008"]
 "app/routers/academic.py" = ["B008"]
 "app/routers/session.py" = ["B008"]
+"app/routers/points.py" = ["B008"]
 
 [tool.mypy]
 python_version = "3.10"
