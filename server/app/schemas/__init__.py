@@ -21,10 +21,13 @@ from app.schemas.job import JobError, JobRef, JobStatus
 from app.schemas.lesson import LessonGenReq, LessonMaterial, LessonPlan, LessonSummary
 from app.schemas.letter import Letter
 from app.schemas.session import (
+    ClassCreateReq,
+    ClassCreateResp,
     ClassInfo,
     ClassPetView,
     EnterReq,
     EnterResp,
+    StudentCreate,
     StudentProfile,
     TeacherEnterReq,
     TeacherEnterResp,
@@ -74,11 +77,14 @@ __all__ = [
     "ScoreCard",
     "ServiceConfig",
     "ServiceConfigUpdate",
+    "StudentCreate",
     "StudentProfile",
     "SubjectScore",
     "TeacherEnterReq",
     "TeacherEnterResp",
     "TeacherProfile",
+    "ClassCreateReq",
+    "ClassCreateResp",
     "AudioChunkEvent",
     "CommitTurnEvent",
     "ImageEvent",

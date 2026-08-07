@@ -1,7 +1,9 @@
-"""Class / student list endpoints (R1, R17)."""
+"""Class / student list endpoints (R1, R17) + teacher class creation."""
 
 from __future__ import annotations
 
+import secrets
+import sqlite3
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,10 +11,20 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.constants import REGION_NAMES
 from app.db import get_db_connection
 from app.deps import CurrentUser, get_current_user
-from app.schemas import ClassInfo, ClassPetView, PetState, StudentProfile
+from app.schemas import (
+    ClassCreateReq,
+    ClassCreateResp,
+    ClassInfo,
+    ClassPetView,
+    PetState,
+    StudentProfile,
+)
 from app.schemas.common import ErrorEnvelope
 
 router = APIRouter(prefix="/classes", tags=["classes"])
+
+# 生成班级码时剔除易混淆字符（0/O、1/I/L）
+_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 
 def _class_not_found(class_code: str) -> HTTPException:
@@ -26,12 +38,99 @@ def _class_not_found(class_code: str) -> HTTPException:
     )
 
 
+def _generate_class_code(conn: sqlite3.Connection) -> str:
+    """生成可读且全局唯一的学生端接入班级码。"""
+    for _ in range(200):
+        code = "S" + "".join(secrets.choice(_CODE_ALPHABET) for _ in range(5))
+        exists = conn.execute(
+            "SELECT 1 FROM classes WHERE class_code = ?", (code,)
+        ).fetchone()
+        if exists is None:
+            return code
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=ErrorEnvelope(
+            code="CLASS_CODE_EXHAUSTED", message="生成班级码失败，请重试"
+        ).model_dump(),
+    )
+
+
 def _parse_dt(value: str | None) -> datetime:
     if value:
         return datetime.fromisoformat(value)
     from datetime import timezone
 
     return datetime.now(timezone.utc)
+
+
+@router.post("", response_model=ClassCreateResp, status_code=status.HTTP_201_CREATED)
+def create_class(req: ClassCreateReq) -> ClassCreateResp:
+    """教师建班：创建班级与学生名单，并生成学生端接入班级码。"""
+    conn = get_db_connection()
+    try:
+        code = _generate_class_code(conn)
+        region_name = REGION_NAMES.get(req.region_key, req.region_key)
+
+        conn.execute(
+            "INSERT INTO classes (class_code, class_name, school, region_key, grade, class_no) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                code,
+                req.class_name,
+                req.school,
+                req.region_key,
+                req.grade,
+                req.class_no,
+            ),
+        )
+
+        profiles: list[StudentProfile] = []
+        for i, s in enumerate(req.students, start=1):
+            student_id = f"{code}-{i:02d}"
+            student_no = f"{code}-{i:02d}"
+            conn.execute(
+                "INSERT INTO students "
+                "(student_id, class_code, name, grade, student_no, ideal, avatar_seed, role) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    student_id,
+                    code,
+                    s.name,
+                    s.grade or req.grade,
+                    student_no,
+                    s.ideal,
+                    s.avatar_seed,
+                    "member",
+                ),
+            )
+            profiles.append(
+                StudentProfile(
+                    id=student_id,
+                    name=s.name,
+                    student_no=student_no,
+                    class_code=code,
+                    avatar_seed=s.avatar_seed,
+                    role="member",
+                    grade=s.grade or req.grade,
+                    region_key=req.region_key,
+                    region_name=region_name,
+                    ideal=s.ideal,
+                )
+            )
+
+        conn.commit()
+        return ClassCreateResp(
+            class_code=code,
+            class_name=req.class_name,
+            school=req.school,
+            region_key=req.region_key,
+            region_name=region_name,
+            grade=req.grade,
+            class_no=req.class_no,
+            students=profiles,
+        )
+    finally:
+        conn.close()
 
 
 @router.get("/{class_code}", response_model=ClassInfo)

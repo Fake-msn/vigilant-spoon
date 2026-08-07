@@ -51,6 +51,39 @@ class ClassInfo(BaseModel):
     students: list[StudentProfile] = Field(..., description="学生名单")
 
 
+class StudentCreate(BaseModel):
+    """教师建班时录入的学生（学号/角色由后端生成，避免跨班冲突）。"""
+
+    name: str = Field(..., min_length=1, description="学生姓名")
+    grade: str = Field(..., min_length=1, description="年级")
+    avatar_seed: int = Field(default=0, ge=0, description="头像种子")
+    ideal: str | None = Field(default=None, description="理想")
+
+
+class ClassCreateReq(BaseModel):
+    """教师建班请求：地区 + 学校班级 + 学生名单。"""
+
+    class_name: str = Field(..., min_length=1, description="班级名称")
+    school: str = Field(..., min_length=1, description="学校")
+    region_key: str = Field(..., min_length=1, description="地区 key")
+    grade: str = Field(..., min_length=1, description="年级")
+    class_no: str = Field(..., min_length=1, description="班级序号")
+    students: list[StudentCreate] = Field(..., min_length=1, description="学生名单")
+
+
+class ClassCreateResp(BaseModel):
+    """教师建班响应：返回新班级码及班级信息。"""
+
+    class_code: str = Field(..., description="班级码")
+    class_name: str = Field(..., description="班级名称")
+    school: str = Field(..., description="学校")
+    region_key: str = Field(..., description="地区 key")
+    region_name: str = Field(..., description="地区名称")
+    grade: str = Field(..., description="年级")
+    class_no: str = Field(..., description="班级序号")
+    students: list[StudentProfile] = Field(..., description="学生名单")
+
+
 class ClassPetView(BaseModel):
     """R17：班级宠物墙单项（禁评分字段）。"""
 

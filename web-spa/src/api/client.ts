@@ -99,6 +99,24 @@ async function adminRequest<T>(path: string, init: RequestInit = {}): Promise<T>
 }
 
 export const realClient = {
+  createClass: (req: {
+    class_name: string
+    school: string
+    region_key: string
+    grade: string
+    class_no: string
+    students: { name: string; grade: string; avatar_seed: number; ideal?: string }[]
+  }) =>
+    request<{
+      class_code: string
+      class_name: string
+      school: string
+      region_key: string
+      region_name: string
+      grade: string
+      class_no: string
+      students: { id: string; name: string; student_no: string; grade: string; avatar_seed: number; role: string; region_key: string; region_name: string; ideal?: string }[]
+    }>(`/classes`, { method: 'POST', body: JSON.stringify(req) }),
   getClass: (code: string) => request<{
     class_code: string
     class_name: string

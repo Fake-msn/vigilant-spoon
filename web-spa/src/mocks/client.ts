@@ -7,6 +7,39 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const ADMIN_PASSWORD = 'admin123'
 
 export const mockClient = {
+  async createClass(req: {
+    class_name: string
+    school: string
+    region_key: string
+    grade: string
+    class_no: string
+    students: { name: string; grade: string; avatar_seed: number; ideal?: string }[]
+  }) {
+    await delay(400)
+    const class_code = `S${Math.random().toString(36).slice(2, 7).toUpperCase()}`
+    const region = regions.find((r) => r.key === req.region_key) ?? regions[0]
+    return {
+      class_code,
+      class_name: req.class_name,
+      school: req.school,
+      region_key: region.key,
+      region_name: region.name,
+      grade: req.grade,
+      class_no: req.class_no,
+      students: req.students.map((s, i) => ({
+        id: `${class_code}-${i + 1}`,
+        name: s.name,
+        student_no: `${class_code}-${i + 1}`,
+        grade: s.grade || req.grade,
+        avatar_seed: s.avatar_seed,
+        role: 'member',
+        region_key: region.key,
+        region_name: region.name,
+        ideal: s.ideal,
+      })),
+    }
+  },
+
   async getClass(code: string) {
     await delay(300)
     if (code !== 'LTZ2024') {
