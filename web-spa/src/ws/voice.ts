@@ -20,12 +20,15 @@ export type VoiceClientOptions = {
   onError?: (err: Error) => void
 }
 
+// 按当前页面协议推导 WS 地址，避免在 HTTPS 下写死 ws://（浏览器会禁止 ws 明文连接）
+export const wsBase = (): string =>
+  `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`
+
 function buildWsUrl(token: string, studentId: string, mode: string): string {
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const base = import.meta.env.VITE_API_BASE || '/api'
-  // 去掉可能的前导 http/https，保留 path
+  // 去掉可能的前导 http/https，保留 path（走 vite 代理转发到后端）
   const path = base.replace(/^https?:\/\/[^/]+/, '')
-  return `${proto}//${window.location.host}${path}/ws/voice?token=${encodeURIComponent(token)}&student_id=${encodeURIComponent(studentId)}&mode=${encodeURIComponent(mode)}`
+  return `${wsBase()}${path}/ws/voice?token=${encodeURIComponent(token)}&student_id=${encodeURIComponent(studentId)}&mode=${encodeURIComponent(mode)}`
 }
 
 export class VoiceClient {
