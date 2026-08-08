@@ -1,0 +1,7 @@
+# 小信 HTTPS 反向代理（Caddy 自动签发/续期 Let's Encrypt 证书）
+# 部署时在 .env 中设置 DOMAIN=<你的域名>，并确保 A 记录已解析到 139.155.132.128
+# WebSocket（/api/ws/voice）由 Caddy reverse_proxy 自动透传升级。
+
+{$DOMAIN} {
+    reverse_proxy app:8000
+}

@@ -1,0 +1,41 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_PATH: /data/demo.db
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      # DashScope（真实 AI 服务，通过 .env 注入）
+      VOICE_PROVIDER: ${VOICE_PROVIDER:-dashscope}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      TEXT_PROVIDER: ${TEXT_PROVIDER:-dashscope}
+      TEXT_API_KEY: ${TEXT_API_KEY:-}
+      IMAGE_PROVIDER: ${IMAGE_PROVIDER:-dashscope}
+      IMAGE_API_KEY: ${IMAGE_API_KEY:-}
+      EMBED_PROVIDER: ${EMBED_PROVIDER:-dashscope}
+      EMBED_API_KEY: ${EMBED_API_KEY:-}
+    volumes:
+      - app-data:/data
+      - app-static:/app/server/app/static
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+
+volumes:
+  app-data:
+  app-static:
+  caddy-data:
+  caddy-config:
