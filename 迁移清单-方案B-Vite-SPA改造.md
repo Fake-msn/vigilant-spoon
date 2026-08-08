@@ -190,9 +190,24 @@ web-spa/
 
 | 现有文件 | 目标位置 | 改动点 |
 |----------|----------|--------|
-| `lib/data.ts` | `src/mocks/data.ts` | **降级为 mock**：9 组常量保留供 vitest 与本地开发 mock 后端；页面一律改走 `api/client.ts`；类型 import 改自 `types/generated.ts`（字段名以契约为准映射：`dream→ideal`、`no→student_no`、`note` 保留等，映射表随 gen:types 落地时核对） |
+| `lib/data.ts` | `src/mocks/data.ts` | **降级为 mock**：9 组常量保留供 vitest 与本地开发 mock 后端；页面一律改走 `api/client.ts`；类型 import 改自 `types/generated.ts`（字段名以契约为准映射，详见下表） |
 | `public/design/*`（8 个素材） | `web-spa/public/design/` | 原样复制；引用路径不变 |
 | 演示脚本数据（chatScript 等） | `src/mocks/` + 后端 `scripts/seed.py` | 谈心脚本的确定性字段（理想/承诺）迁到后端 seed，前端不持有业务话术 |
+
+#### 4.5.1 字段映射对照表（契约 v2.1）
+
+| 旧字段（`web/lib/data.ts`） | 契约字段（`app/schemas/`） | 落点 | 备注 |
+|---------------------------|---------------------------|------|------|
+| `Student.no` | `Student.student_no` | `mocks/data.ts`、`seed.py` | 学号，字符串 |
+| `Student.dream` | `Student.ideal` | `mocks/data.ts`、`seed.py` | 理想职业，可选 |
+| `AcademicRow.relation` | `AcademicRow.role` | `mocks/data.ts`、`seed.py` | 枚举映射：亲近→`member`/`group_leader`/`subject_rep`（语义就近，不得为 `class_committee`）；一般→`member`；疏远→`member` |
+| `GrowthRow.petMood` | `GrowthRow.state` | `mocks/data.ts`、`seed.py` | `开心/平静/低落` → `daily`/`daily`/`gray`；`cheer` 由后端状态机根据正向信号触发 |
+| `GrowthRow.growth` | — | 已删除 | 成长值不再作为展示字段，禁 score |
+| `GrowthRow.scores` | — | 已删除 | 历次对话得分不再展示 |
+| `GrowthRow.evalSummary` | — | 已删除 | AI 评估摘要不再展示 |
+| `GrowthRow.signal` | `GrowthRow.signal` | `mocks/data.ts`、`seed.py` | 心理信号文案，仅 `gray` 态学生可含 |
+| `CourseRecord.avgScore` | — | 已删除 | 课程平均分不再展示 |
+| `Letter.unread` | `Letter.is_read` | `mocks/data.ts` | 语义取反：`unread=true` → `is_read=false` |
 
 ---
 
@@ -294,6 +309,21 @@ P5  FE-M7  联调 + 视觉对照（@theme 令牌逐页走查）+ 全量回归
 - 前端**禁止手写** `src/types/generated.ts` 中已有类型；字段名映射（`dream→ideal` 等）在 gen 产物落地时一次性核对并登记到 `src/api/mappers.ts`（如需）。
 - `api/client.ts` 统一封装：baseURL 走环境变量（`VITE_API_BASE`）、超时、错误规范化（业务码 → UI 文案）、token 注入；页面不直接 fetch。
 - **mock 开关**：`VITE_USE_MOCK=true` 时 client/ws 全部路由到 `src/mocks/`，保证后端未就绪时前端可独立开发与演示。
+
+**开发代理配置（vite.config.ts）——重要约束**：
+
+> 客户端 `API_BASE` 与 Vite 代理目标**必须解耦**，二者共用同一环境变量会引发请求路径丢失 `/api` 前缀的 bug。
+
+- **约定**：客户端 `API_BASE` 恒为**相对前缀** `/api`（`import.meta.env.VITE_API_BASE || '/api'`），页面请求最终形如 `/api/xxx`，由 Vite 代理转发到后端。
+- **代理目标**：由独立的 `VITE_PROXY_TARGET`（HTTP）与 `VITE_PROXY_TARGET_WS`（WebSocket）控制，默认 `http://localhost:8000` / `ws://localhost:8000`。
+- **正确用法**：本地后端不在 8000 时（例如 8001），只设代理目标，**不要**把 `VITE_API_BASE` 设成绝对 URL——
+  ```
+  $env:VITE_PROXY_TARGET='http://localhost:8001'
+  $env:VITE_PROXY_TARGET_WS='ws://localhost:8001'
+  npm run dev
+  ```
+- **曾踩坑**：若把 `VITE_API_BASE` 设为 `http://localhost:<port>`，`request()` 会拼出 `http://<host>/admin/login`（缺 `/api`），管理员登录/配置等接口全部 404，而默认代理模式（`/api`）下正常——表现为"同一套代码，换端口后接口集体失效"。
+- 该解耦已覆盖全部接口（含管理员后台 `/api/admin/*`），相对前缀下行为一致。
 
 ### 9.2 新旧系统"接口"映射关系
 
