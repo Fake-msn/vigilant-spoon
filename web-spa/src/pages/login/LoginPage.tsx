@@ -19,7 +19,7 @@ const roles = [
     title: '我是老师',
     img: '/design/card-teacher.jpg',
     alt: '带孩子们远望群山的老师',
-    lines: ['呵护每颗心灵，共担每份班务', '我一直在这里'],
+    lines: ['呵护每颗心灵，陪伴每段成长', '我一直在这里'],
   },
 ]
 
