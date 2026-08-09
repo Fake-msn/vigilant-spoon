@@ -20,11 +20,14 @@ export function TeacherLoginPage() {
   }
 
   const submit = async () => {
-    if (!name.trim() || !code.trim()) return
+    if (!name.trim()) return
     setError(null)
     setLoading(true)
     try {
-      const res = await api.teacherEnter(code.trim(), name.trim(), password || undefined)
+      const normalizedCode = code.trim() ? code.trim().toUpperCase() : ''
+      const res = normalizedCode
+        ? await api.teacherEnter(normalizedCode, name.trim(), password || undefined)
+        : await api.teacherLogin(name.trim(), password || undefined)
       setSession({ token: res.session_token, profile: res.profile as never })
       navigate('/teacher', { replace: true })
     } catch (e) {
@@ -44,7 +47,7 @@ export function TeacherLoginPage() {
         <h1 className="font-cal mt-5 text-5xl tracking-[0.12em] text-brand-deep md:text-6xl">
           教师登录
         </h1>
-        <p className="mt-4 text-[15px] text-ink-soft">输入你的姓名和班级码，进入班级开始今天的思政课</p>
+        <p className="mt-4 text-[15px] text-ink-soft">输入你的姓名即可登录，班级码可选（不填将默认进入你任教的班级）</p>
 
         <div className="mt-8 space-y-4">
           <div className="relative">
@@ -62,8 +65,8 @@ export function TeacherLoginPage() {
             <input
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="班级码，例如 LTZ2024"
-              aria-label="班级码"
+              placeholder="班级码（选填，例如 LTZ2024）"
+              aria-label="班级码（选填）"
               autoCapitalize="characters"
               autoCorrect="off"
               spellCheck={false}
@@ -84,7 +87,7 @@ export function TeacherLoginPage() {
           {error && <p className="text-sm text-red-500">{error}</p>}
           <button
             onClick={submit}
-            disabled={!name.trim() || !code.trim() || loading}
+            disabled={!name.trim() || loading}
             className="btn-brand w-full"
           >
             {loading ? '登录中…' : '进入班级'}

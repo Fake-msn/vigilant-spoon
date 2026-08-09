@@ -114,10 +114,17 @@ class EnterResp(BaseModel):
 
 
 class TeacherEnterReq(BaseModel):
-    """教师登录请求（可选密码）"""
+    """教师登录请求（指定班级 + 可选密码）"""
 
     class_code: str = Field(..., min_length=1, description="班级码")
     teacher_name: str = Field(default="李老师", min_length=1, description="教师姓名")
+    password: str | None = Field(default=None, description="密码（账号设置了密码时必填）")
+
+
+class TeacherLoginReq(BaseModel):
+    """不指定班级的教师登录请求（按姓名+密码校验，默认进入首个任教班级）"""
+
+    teacher_name: str = Field(..., min_length=1, description="教师姓名")
     password: str | None = Field(default=None, description="密码（账号设置了密码时必填）")
 
 

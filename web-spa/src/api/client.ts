@@ -189,6 +189,8 @@ export const realClient = {
     const $code = normalizeClassCode(code)
     return request<{ session_token: string; profile: Record<string, unknown>; expires_at: string }>(`/session/teacher/enter`, { method: 'POST', body: JSON.stringify({ class_code: $code, teacher_name: teacherName, password }) })
   },
+  // 不指定班级码的教师登录：校验姓名+密码，默认分配首个任教班级生成会话（后端保证 profile.class_code 非空，便于后续页面读取）
+  teacherLogin: (teacherName: string, password?: string) => request<{ session_token: string; profile: Record<string, unknown>; expires_at: string }>(`/session/teacher/login`, { method: 'POST', body: JSON.stringify({ teacher_name: teacherName, password }) }),
   getTeacherClasses: () => request<{
     teacher_id: string
     name: string

@@ -141,6 +141,44 @@ export const mockClient = {
     }
   },
 
+  // 不指定班级码的教师登录：校验姓名+密码，默认分配首个任教班级生成会话（与 getTeacherClasses 返回的首个班级保持一致）
+  async teacherLogin(teacherName: string, password?: string) {
+    await delay(300)
+    const account = mockTeachers.find((t) => t.name === teacherName)
+    if (!account) {
+      throw new ApiClientError('该教师尚未注册，请先完成账号注册', 404, 'TEACHER_NOT_REGISTERED')
+    }
+    if (account.status === 'pending') {
+      throw new ApiClientError('该教师账号正在等待管理员审核，暂无法登录', 403, 'TEACHER_PENDING_REVIEW')
+    }
+    if (account.status === 'rejected') {
+      throw new ApiClientError('该教师账号已被驳回', 403, 'TEACHER_REJECTED')
+    }
+    if (account.password_hash && account.password_hash !== password) {
+      throw new ApiClientError('密码不正确', 401, 'WRONG_PASSWORD')
+    }
+    // 取默认任教班级（首个），确保后续课堂相关页面可直接读取 class_code/class_name
+    const defaultClass = (await this.getTeacherClasses()).classes[0]
+    const region = regions.find((r) => r.key === 'yunnan') ?? regions[0]
+    const classCode = defaultClass ? normalizeClassCode(defaultClass.class_code) : 'LTZ2024'
+    const className = defaultClass?.class_name ?? '三（1）班'
+    const school = (account.school || defaultClass?.school || '龙头山镇中心小学').trim() || '龙头山镇中心小学'
+    return {
+      session_token: `st_${teacherName.padEnd(48, '0').slice(0, 48)}`,
+      profile: {
+        id: `teacher-${teacherName}`,
+        name: teacherName,
+        role: 'teacher' as const,
+        class_code: classCode,
+        class_name: className,
+        school,
+        region_key: region.key,
+        region_name: region.name,
+      },
+      expires_at: new Date().toISOString(),
+    }
+  },
+
   async teacherRegister(req: {
     name: string
     school?: string
