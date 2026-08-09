@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
+import { DemoModeToggle } from '@/components/DemoModeToggle'
 import { getSession, isStudentProfile, setSession } from '@/stores/session'
 
 export function TeacherLoginPage() {
@@ -34,6 +35,7 @@ export function TeacherLoginPage() {
 
   return (
     <div className="relative mx-auto w-full max-w-[1760px] overflow-x-clip px-6 py-10 lg:px-10">
+      <DemoModeToggle variant="navigate-home" />
       <img src="/design/leaves.png" alt="" aria-hidden className="pointer-events-none absolute -right-10 -top-6 hidden w-72 opacity-70 lg:block" />
       <img src="/design/cloud.png" alt="" aria-hidden className="pointer-events-none absolute -left-24 bottom-0 hidden w-72 opacity-40 lg:block" />
 
