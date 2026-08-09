@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { api } from '@/api/client'
 import { getAdminToken, setAdminToken, type KnowledgeDoc, type PendingTeacher, type ServiceConfig } from '@/api/client'
 import { Icon } from '@/components/Icon'
+import { DemoModeToggle } from '@/components/DemoModeToggle'
+import { DEMO } from '@/constants/demo'
 
 const EMPTY_CONFIG: ServiceConfig = {
   voice_provider: 'local',
@@ -90,6 +92,33 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
           <p className="text-sm text-ink-soft">输入管理员密码以配置模型服务</p>
         </div>
         <div className="mt-6">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                setLoading(true)
+                setError('')
+                await api.adminLogin(DEMO.ADMIN_PASSWORD)
+                onSuccess()
+              } catch (e) {
+                setError(e instanceof Error ? e.message : '演示快速进入失败')
+              } finally {
+                setLoading(false)
+              }
+            }}
+            disabled={loading}
+            className="btn-line w-full !py-2.5 text-sm inline-flex items-center justify-center gap-1.5"
+          >
+            <Icon name="sparkles" size={14} />
+            演示快速进入管理员
+          </button>
+
+          <div className="my-4 flex items-center gap-3">
+            <div className="h-px flex-1 bg-line" />
+            <span className="text-[11px] uppercase tracking-wider text-ink-faint">正式登录</span>
+            <div className="h-px flex-1 bg-line" />
+          </div>
+
           <Field label="管理员密码">
             <input
               type="password"
@@ -97,7 +126,6 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submit()}
               placeholder="请输入密码"
-              autoFocus
               className="input-soft"
             />
           </Field>
@@ -435,7 +463,8 @@ export function AdminConfigPage() {
 
   if (!authed) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-6 py-10 lg:px-10">
+      <div className="relative mx-auto w-full max-w-6xl px-6 py-10 lg:px-10">
+        <DemoModeToggle variant="navigate-home" />
         <div className="mb-6">
           <Link to="/teacher" className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-faint transition-colors hover:text-brand">
             <Icon name="arrow-left" size={13} />
