@@ -12,7 +12,7 @@ const roles = [
     title: '我是学生',
     img: '/design/card-students.jpg',
     alt: '教室里读书的孩子们',
-    lines: ['画下你的话，写下我的信', '我一直在这里'],
+    lines: ['畅谈你的梦想，写下我的希望', '我一直在这里'],
   },
   {
     to: '/teacher/login',
