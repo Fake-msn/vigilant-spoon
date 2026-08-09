@@ -14,7 +14,7 @@ import {
 import { KidAvatar } from '@/components/art/KidAvatar'
 import { TeacherAvatar } from '@/components/art/TeacherAvatar'
 import { VoiceClient, type VoiceEvent, type VoicePhase } from '@/ws/voice'
-import { getSession, isStudentProfile } from '@/stores/session'
+import { clearSession, getSession, isStudentProfile } from '@/stores/session'
 
 type Msg =
   | { from: 'ai'; text: string; image?: 'cake' | 'dream' }
@@ -418,7 +418,15 @@ export function VoicePage() {
           </div>
 
           <button
-            onClick={() => navigate('/identity')}
+            onClick={() => {
+              // 提前拿到当前学生所属班级码，清 session 后通过路由 state 带入 IdentityPage
+              // 直接进入同班同学自由选择步骤，避免用户再输一次班级码
+              // 同时修复之前不清 session 被 IdentityPage 顶部 Navigate 直接弹回 /student 的隐 bug
+              const { profile } = getSession()
+              const presetClass = profile && isStudentProfile(profile) ? profile.class_code.trim() : undefined
+              clearSession()
+              navigate('/identity', { replace: true, state: presetClass ? { presetClass } : undefined })
+            }}
             className="text-center text-xs font-medium text-ink-faint transition-colors hover:text-brand"
           >
             换个同学重新进入 →

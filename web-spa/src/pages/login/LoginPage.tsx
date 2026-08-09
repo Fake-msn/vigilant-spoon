@@ -94,7 +94,11 @@ export function LoginPage() {
             {/* 左：学生演示 */}
             <button
               type="button"
-              onClick={() => navigate('/identity', { state: { ...(location.state as object), preloadClass: DEMO.CLASS } })}
+              onClick={() =>
+                navigate('/identity', {
+                  state: { ...(location.state as object), presetClass: DEMO.CLASS, demoHighlight: true },
+                })
+              }
               className="group relative overflow-hidden rounded-xl border border-dashed border-line bg-white/80 text-center shadow-card transition-all hover:-translate-y-2 hover:border-brand/40 hover:bg-white hover:shadow-lift animate-rise"
               style={{ animationDelay: '0.12s' }}
             >

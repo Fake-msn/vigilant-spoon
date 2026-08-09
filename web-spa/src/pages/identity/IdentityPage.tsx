@@ -28,26 +28,34 @@ export function IdentityPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const preloadClass = (location.state as { preloadClass?: string } | null)?.preloadClass
+  const locationState = (location.state as { presetClass?: string; preloadClass?: string; demoHighlight?: boolean; from?: string } | null) ?? null
+  // 兼容旧字段 preloadClass（LoginPage 演示入口）与新统一字段 presetClass（换同学入口等），都进入同一自动加载流程
+  const presetClass = (locationState?.presetClass ?? locationState?.preloadClass)?.trim() || undefined
+  // 关键：是否默认高亮一位学生，仅看入口是否显式声明了 demoHighlight=true
+  // 不能按"班级码等于 LTZ2024"判断——因为正式模式用户手工输入 LTZ2024 后再切换同班同学，也不应该替 TA 选中任何人
+  const shouldHighlightDemo = locationState?.demoHighlight === true && presetClass === DEMO.CLASS
 
-  // 挂载时如果带了 preloadClass，直接拉班级数据并进入 pick 步（仅首次）
+  // 挂载时如果带了 presetClass（已登录学生切换同班同学 / 演示入口），直接拉班级数据并进入 pick 步（仅首次）
+  // 注意：演示模式才默认高亮王小雅；正式模式切换同班同学时不默认选，让用户自由挑选
   useEffect(() => {
-    if (!preloadClass) return
+    if (!presetClass) return
     let cancelled = false
     ;(async () => {
       try {
         setLoading(true)
-        const cls = await api.getClass(preloadClass)
+        const cls = await api.getClass(presetClass)
         if (cancelled) return
-        setCode(preloadClass)
+        setCode(presetClass)
         setClassName(cls.class_name)
         setStudents(cls.students)
-        const defaultStudent = cls.students.find((s) => s.name === DEMO.STUDENT) ?? null
+        const defaultStudent = shouldHighlightDemo
+          ? cls.students.find((s) => s.name === DEMO.STUDENT) ?? null
+          : null
         setSelected(defaultStudent?.id ?? null)
         setStep('pick')
         setError(null)
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : '加载演示班级失败')
+        if (!cancelled) setError(e instanceof Error ? e.message : '加载班级失败，请重新输入班级码')
       } finally {
         if (!cancelled) setLoading(false)
       }

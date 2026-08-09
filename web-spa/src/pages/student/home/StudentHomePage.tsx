@@ -9,8 +9,12 @@ export function StudentHomePage() {
   if (!profile || !isStudentProfile(profile)) return <Navigate to="/" replace />
 
   const switchClassmate = () => {
+    // 提前拿到当前学生所属班级码，清 session 后通过路由 state 带入 IdentityPage
+    // 直接进入同班同学自由选择步骤，避免用户再输一次班级码
+    const { profile } = getSession()
+    const presetClass = profile && isStudentProfile(profile) ? profile.class_code.trim() : undefined
     clearSession()
-    navigate('/identity', { replace: true })
+    navigate('/identity', { replace: true, state: presetClass ? { presetClass } : undefined })
   }
 
   const entries = [
