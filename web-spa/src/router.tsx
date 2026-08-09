@@ -75,6 +75,8 @@ export const routes: RouteObject[] = [
   { path: '/identity', element: <IdentityPage /> },
   { path: '/teacher/login', element: <TeacherLoginPage /> },
   { path: '/teacher/register', element: <TeacherRegisterPage /> },
+  // admin 自包含 LoginPanel 守卫（ad_ token 在 admin_token 里），不能放 ProtectedLayout 下
+  { path: '/admin', element: <AdminConfigPage /> },
   {
     element: <ProtectedLayout />,
     children: [
@@ -107,7 +109,6 @@ export const routes: RouteObject[] = [
           },
         ],
       },
-      { path: '/admin', element: <AdminConfigPage /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
