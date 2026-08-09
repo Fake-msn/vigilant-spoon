@@ -4,6 +4,11 @@ import type { Profile } from '@/stores/session'
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+/** 统一清洗班级码：去首尾空白 + 强制大写，与 realClient 保持一致 */
+function normalizeClassCode(code: string): string {
+  return code.trim().toUpperCase()
+}
+
 const ADMIN_PASSWORD = 'admin123'
 
 // 已注册教师账号（演示：李老师默认已通过审核且未设密码；新注册账号待管理员审核）
@@ -48,12 +53,13 @@ export const mockClient = {
 
   async getClass(code: string) {
     await delay(300)
-    if (code !== 'LTZ2024') {
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
     const region = regions[0]
     return {
-      class_code: code,
+      class_code: $code,
       class_name: '三（1）班',
       school: '龙头山镇中心小学',
       region_key: region.key,
@@ -76,6 +82,7 @@ export const mockClient = {
 
   async enter(code: string, studentName: string) {
     await delay(300)
+    const $code = normalizeClassCode(code)
     const student = students.find((s) => s.name === studentName)
     if (!student) {
       throw new ApiClientError('姓名不在班级名单中', 404, 'STUDENT_NOT_FOUND')
@@ -88,7 +95,7 @@ export const mockClient = {
       student_no: student.student_no,
       avatar_seed: student.avatar_seed,
       ideal: student.ideal,
-      class_code: code,
+      class_code: $code,
       region_key: region.key,
       region_name: region.name,
     }
@@ -100,7 +107,8 @@ export const mockClient = {
 
   async teacherEnter(code: string, teacherName: string, password?: string) {
     await delay(300)
-    if (code !== 'LTZ2024') {
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
     const account = mockTeachers.find((t) => t.name === teacherName)
@@ -123,7 +131,7 @@ export const mockClient = {
         id: `teacher-${teacherName}`,
         name: teacherName,
         role: 'teacher' as const,
-        class_code: code,
+        class_code: $code,
         class_name: '三（1）班',
         school: account.school || '龙头山镇中心小学',
         region_key: region.key,
@@ -250,17 +258,18 @@ export const mockClient = {
 
   async teacherSwitch(classCode: string) {
     await delay(300)
-    if (classCode !== 'LTZ2024') {
+    const $code = normalizeClassCode(classCode)
+    if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
     const region = regions[0]
     return {
-      session_token: `st_${classCode.padEnd(48, '0').slice(0, 48)}`,
+      session_token: `st_${$code.padEnd(48, '0').slice(0, 48)}`,
       profile: {
         id: `teacher-李老师`,
         name: '李老师',
         role: 'teacher' as const,
-        class_code: classCode,
+        class_code: $code,
         class_name: '三（1）班',
         school: '龙头山镇中心小学',
         region_key: region.key,
@@ -272,11 +281,12 @@ export const mockClient = {
 
   async startClass(code: string) {
     await delay(200)
-    if (code !== 'LTZ2024') {
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
     return {
-      session_id: `cls-${code}`,
+      session_id: `cls-${$code}`,
       state: 'active' as const,
       current_student: students[0]?.id ?? null,
       current_slot: null,
@@ -292,13 +302,14 @@ export const mockClient = {
     payload?: Record<string, unknown>,
   ) {
     await delay(200)
-    if (code !== 'LTZ2024') {
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
     const slot = typeof payload?.slot === 'string' ? payload.slot : null
     const selected = typeof payload?.student_id === 'string' ? payload.student_id : null
     return {
-      session_id: `cls-${code}`,
+      session_id: `cls-${$code}`,
       state: action === 'pause' ? ('paused' as const) : ('active' as const),
       current_student: selected ?? students[0]?.id ?? null,
       current_slot: slot,
@@ -309,11 +320,12 @@ export const mockClient = {
 
   async getClassStatus(code: string) {
     await delay(200)
-    if (code !== 'LTZ2024') {
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
     return {
-      session_id: `cls-${code}`,
+      session_id: `cls-${$code}`,
       state: 'idle' as const,
       current_student: null,
       current_slot: null,
@@ -422,7 +434,8 @@ export const mockClient = {
 
   async getClassLessons(code: string) {
     await delay(200)
-    if (code !== 'LTZ2024') {
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
     return courseRecords.map((c) => ({
@@ -460,7 +473,8 @@ export const mockClient = {
 
   async getAcademicSummary(code: string) {
     await delay(200)
-    if (code !== 'LTZ2024') {
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
     const records = academicRows.map((r) => {
@@ -487,7 +501,8 @@ export const mockClient = {
 
   async importAcademicJson(code: string, records: { student_no: string; scores: { subject: string; score: number }[]; role: string; background?: string; teacher_note?: string }[]) {
     await delay(300)
-    if (code !== 'LTZ2024') {
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
     const mapped = records.map((r) => {
@@ -515,7 +530,8 @@ export const mockClient = {
 
   async manualAddAcademic(code: string, entry: { name: string; student_no?: string; scores: { subject: string; score: number }[]; role: string; background?: string; teacher_note?: string }) {
     await delay(300)
-    if (code !== 'LTZ2024') {
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
     const existing = academicRows.find((r) => {
@@ -531,20 +547,22 @@ export const mockClient = {
         note: entry.teacher_note || '',
       })
     }
-    return this.getAcademicSummary(code)
+    return this.getAcademicSummary($code)
   },
 
   async importAcademicFile(code: string, _file: File) {
     await delay(500)
-    if (code !== 'LTZ2024') {
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
-    return this.getAcademicSummary(code)
+    return this.getAcademicSummary($code)
   },
 
   async getClassPets(code: string) {
     await delay(200)
-    if (code !== 'LTZ2024') {
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
     return students.map((s) => ({
@@ -663,7 +681,8 @@ export const mockClient = {
   // 班宠积分制度（mock：内存态）
   async getPointRules(code: string) {
     await delay(200)
-    if (code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     return [
       { rule_id: 'LTZ2024-hand-raise', name: '主动举手发言', points: 5, category: 'hand-raise', enabled: true },
       { rule_id: 'LTZ2024-answer', name: '回答正确', points: 10, category: 'answer', enabled: true },
@@ -673,18 +692,21 @@ export const mockClient = {
   },
   async updatePointRules(code: string, rules: { name: string; points: number }[]) {
     await delay(200)
-    if (code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     return rules.map((r, i) => ({ rule_id: `LTZ2024-custom-${i}`, name: r.name, points: r.points, category: null, enabled: true }))
   },
   async awardPoints(code: string, req: { student_id: string; points?: number | null; name?: string | null }) {
     await delay(200)
-    if (code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     const points = req.points ?? 5
     return { student_id: req.student_id, points, points_total: points, level: 1, leveled_up: false, hunger: 45, mood: 65, state: 'daily', ledger_id: Date.now() }
   },
   async getPointOverview(code: string) {
     await delay(200)
-    if (code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     return {
       rules: [
         { rule_id: 'LTZ2024-hand-raise', name: '主动举手发言', points: 5, category: 'hand-raise', enabled: true },
@@ -699,12 +721,14 @@ export const mockClient = {
   async getGroups() { await delay(200); return [] },
   async configGroups(code: string, groups: { group_name: string }[]) {
     await delay(200)
-    if (code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     return groups.map((g, i) => ({ group_id: `LTZ2024-g0${i + 1}`, group_name: g.group_name, color: null, members: [] }))
   },
   async getLeaderboard(code: string) {
     await delay(200)
-    if (code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
+    const $code = normalizeClassCode(code)
+    if ($code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     return { items: [] }
   },
   async getStudentPoints() { await delay(200); return [] },

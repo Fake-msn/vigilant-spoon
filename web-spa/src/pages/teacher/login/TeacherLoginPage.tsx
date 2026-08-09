@@ -61,9 +61,12 @@ export function TeacherLoginPage() {
             <Icon name="book" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint" />
             <input
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="班级码，例如 LTZ2024"
               aria-label="班级码"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
               className="input-soft !pl-11 uppercase tracking-widest"
             />
           </div>

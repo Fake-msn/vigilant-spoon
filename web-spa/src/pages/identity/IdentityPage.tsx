@@ -30,7 +30,8 @@ export function IdentityPage() {
 
   const locationState = (location.state as { presetClass?: string; preloadClass?: string; demoHighlight?: boolean; from?: string } | null) ?? null
   // 兼容旧字段 preloadClass（LoginPage 演示入口）与新统一字段 presetClass（换同学入口等），都进入同一自动加载流程
-  const presetClass = (locationState?.presetClass ?? locationState?.preloadClass)?.trim() || undefined
+  // 统一大写 + 去空白，避免与存储的班级码大小写不匹配
+  const presetClass = (locationState?.presetClass ?? locationState?.preloadClass)?.trim().toUpperCase() || undefined
   // 关键：是否默认高亮一位学生，仅看入口是否显式声明了 demoHighlight=true
   // 不能按"班级码等于 LTZ2024"判断——因为正式模式用户手工输入 LTZ2024 后再切换同班同学，也不应该替 TA 选中任何人
   const shouldHighlightDemo = locationState?.demoHighlight === true && presetClass === DEMO.CLASS
@@ -126,9 +127,12 @@ export function IdentityPage() {
           <div className="mt-8 space-y-4">
             <input
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="例如 LTZ2024"
               aria-label="班级码"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
               className="input-soft text-center uppercase tracking-widest"
             />
             {error && <p className="text-sm text-red-500">{error}</p>}
