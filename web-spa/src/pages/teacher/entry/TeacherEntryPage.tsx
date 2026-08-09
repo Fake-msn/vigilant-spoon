@@ -20,12 +20,6 @@ const options = [
     desc: '录入地区与学校信息，导入学生名单、照片和学情数据，从零建立班级档案。',
     action: '开始建班',
   },
-  {
-    to: '/teacher/courses',
-    title: '我要管理老班级',
-    desc: '进入已有班级，查看学情档案、成长档案与往期课程，继续本周的思政课。',
-    action: '进入班级',
-  },
 ]
 
 export function TeacherEntryPage() {
@@ -54,15 +48,21 @@ export function TeacherEntryPage() {
     }
   }, [])
 
-  const switchClass = async (code: string) => {
-    if (profile && code === profile.class_code) return
+  const switchClass = async (code: string, thenEnter = false) => {
+    if (profile && code === profile.class_code) {
+      // 已是当前班级：若指定 thenEnter 直接跳课程页
+      if (thenEnter) navigate('/teacher/courses')
+      return
+    }
     setSwitching(code)
     setError(null)
     try {
       const res = await api.teacherSwitch(code)
       setSession({ token: res.session_token, profile: res.profile as never })
-      // 切换成功后重定向到 /teacher，让 TeacherConsoleLayout 重新读取会话并刷新侧栏班级信息
-      navigate('/teacher', { replace: true })
+      // 不做同路由 navigate（否则组件不卸载，switching 状态永远残留导致按钮全局卡死）。
+      // 直接 setSwitching(null) 触发重渲染，组件重新执行 getSession() 即可读到新 profile。
+      setSwitching(null)
+      if (thenEnter) navigate('/teacher/courses')
     } catch (e) {
       setError(e instanceof Error ? e.message : '切换失败')
       setSwitching(null)
@@ -170,16 +170,33 @@ export function TeacherEntryPage() {
                     </p>
                   </div>
                   {active ? (
-                    <span className="text-sm font-semibold text-brand">使用中</span>
-                  ) : (
-                    <button
-                      onClick={() => switchClass(c.class_code)}
-                      disabled={switching !== null}
-                      className="btn-brand !px-4 !py-2 text-sm"
+                    <Link
+                      to="/teacher/courses"
+                      className="btn-brand inline-flex items-center gap-1.5 !px-4 !py-2 text-sm"
                     >
-                      {switching === c.class_code ? '切换中…' : '切换'}
+                      进入班级
                       <Icon name="arrow-right" size={15} />
-                    </button>
+                    </Link>
+                  ) : (
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => switchClass(c.class_code)}
+                        disabled={switching === c.class_code}
+                        className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-ink transition-colors hover:border-brand/50 hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {switching === c.class_code ? '切换中…' : '切换'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => switchClass(c.class_code, true)}
+                        disabled={switching !== null}
+                        className="btn-brand inline-flex items-center gap-1.5 !px-4 !py-2 text-sm"
+                      >
+                        {switching === c.class_code ? '切换中…' : '进入班级'}
+                        <Icon name="arrow-right" size={15} />
+                      </button>
+                    </div>
                   )}
                 </div>
               )
