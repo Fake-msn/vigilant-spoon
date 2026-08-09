@@ -4,7 +4,7 @@ import { api } from '@/api/client'
 import { getAdminToken, setAdminToken, type KnowledgeDoc, type PendingTeacher, type ServiceConfig } from '@/api/client'
 import { Icon } from '@/components/Icon'
 import { DemoModeToggle } from '@/components/DemoModeToggle'
-import { DEMO } from '@/constants/demo'
+import { DEMO, getLoginMode } from '@/constants/demo'
 
 const EMPTY_CONFIG: ServiceConfig = {
   voice_provider: 'local',
@@ -67,6 +67,8 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const isDemo = getLoginMode() === 'demo'
+
   const submit = async () => {
     if (!password) return
     setLoading(true)
@@ -89,35 +91,39 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
             <Icon name="settings" size={28} />
           </span>
           <h1 className="text-2xl font-bold text-ink">管理员登录</h1>
-          <p className="text-sm text-ink-soft">输入管理员密码以配置模型服务</p>
+          <p className="text-sm text-ink-soft">配置在线模型服务、管理RAG知识库、系统后台</p>
         </div>
-        <div className="mt-6">
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                setLoading(true)
-                setError('')
-                await api.adminLogin(DEMO.ADMIN_PASSWORD)
-                onSuccess()
-              } catch (e) {
-                setError(e instanceof Error ? e.message : '演示快速进入失败')
-              } finally {
-                setLoading(false)
-              }
-            }}
-            disabled={loading}
-            className="btn-line w-full !py-2.5 text-sm inline-flex items-center justify-center gap-1.5"
-          >
-            <Icon name="sparkles" size={14} />
-            演示快速进入管理员
-          </button>
+        <div className="mt-6 space-y-4">
+          {isDemo && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  setLoading(true)
+                  setError('')
+                  await api.adminLogin(DEMO.ADMIN_PASSWORD)
+                  onSuccess()
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : '演示快速进入失败')
+                } finally {
+                  setLoading(false)
+                }
+              }}
+              disabled={loading}
+              className="btn-line w-full !py-2.5 text-sm inline-flex items-center justify-center gap-1.5"
+            >
+              <Icon name="sparkles" size={14} />
+              演示快速进入管理员
+            </button>
+          )}
 
-          <div className="my-4 flex items-center gap-3">
-            <div className="h-px flex-1 bg-line" />
-            <span className="text-[11px] uppercase tracking-wider text-ink-faint">正式登录</span>
-            <div className="h-px flex-1 bg-line" />
-          </div>
+          {isDemo && (
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-line" />
+              <span className="text-[11px] uppercase tracking-wider text-ink-faint">正式登录</span>
+              <div className="h-px flex-1 bg-line" />
+            </div>
+          )}
 
           <Field label="管理员密码">
             <input
@@ -471,9 +477,9 @@ export function AdminConfigPage() {
             返回教师后台
           </Link>
         </div>
-        <div className="text-center">
-          <span className="tag bg-white text-ink-soft border border-line">模型服务配置 · 管理员后台</span>
-          <h1 className="title-pill mt-5 text-4xl md:text-5xl">系统配置</h1>
+        {/* 按下方登录窗口的中心线水平中置：外层 mx-auto + max-w-md 与 LoginPanel 同宽，内部 text-center */}
+        <div className="mx-auto w-full max-w-md text-center">
+          <h1 className="title-pill text-4xl md:text-5xl">系统配置</h1>
         </div>
         <div className="mt-10">
           <LoginPanel onSuccess={() => setAuthed(true)} />
