@@ -103,10 +103,12 @@ async def voice_websocket(websocket: WebSocket) -> None:
                 raw = await websocket.receive()
                 if "bytes" in raw:
                     pcm16 = raw["bytes"]
+                    print(f"[VOICE-DEBUG] receive bytes: {len(pcm16)}", flush=True)
                     if isinstance(pcm16, bytes):
                         provider.send_audio(pcm16)
                 elif "text" in raw:
                     text = raw["text"]
+                    print(f"[VOICE-DEBUG] receive text: {text[:40]}", flush=True)
                     if isinstance(text, str):
                         try:
                             msg = json.loads(text)

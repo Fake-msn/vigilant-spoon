@@ -38,7 +38,8 @@ class TranscriptEvent(VoiceEvent):
 
 class AudioChunkEvent(VoiceEvent):
     type: Literal["audio_chunk"] = "audio_chunk"
-    data: str  # base64 PCM16 or音频元数据；演示期可只发占位
+    data: str = ""  # base64 PCM16；演示期可只发占位
+    rate: int = 24000  # 输出采样率，供前端按相同采样率解码播放
 
 
 class ImageEvent(VoiceEvent):

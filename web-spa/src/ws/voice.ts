@@ -1,11 +1,12 @@
 import { Pcm16Recorder } from './recorder'
+import { Pcm16Player } from './player'
 
 export type VoiceEvent =
   | { type: 'session_started' }
   | { type: 'vad_start' }
   | { type: 'transcript'; from: 'me' | 'ai'; text: string }
   | { type: 'vad_end' }
-  | { type: 'audio_chunk' }
+  | { type: 'audio_chunk'; data: string; rate: number }
   | { type: 'image'; kind: 'cake' | 'dream' }
   | { type: 'turn_end' }
   | { type: 'session_end' }
@@ -34,6 +35,7 @@ function buildWsUrl(token: string, studentId: string, mode: string): string {
 export class VoiceClient {
   private ws: WebSocket | null = null
   private recorder: Pcm16Recorder | null = null
+  private player: Pcm16Player | null = null
   private options: VoiceClientOptions
   private _recording = false
 
@@ -77,6 +79,7 @@ export class VoiceClient {
 
   disconnect(): void {
     this._stopRecorder()
+    this._stopPlayer()
     if (this.ws) {
       const ws = this.ws
       this.ws = null
@@ -119,6 +122,22 @@ export class VoiceClient {
     this._recording = false
   }
 
+  private _stopPlayer(): void {
+    if (this.player) {
+      this.player.stop()
+      this.player = null
+    }
+  }
+
+  private _ensurePlayer(rate: number): Pcm16Player {
+    if (!this.player || this.player.context?.sampleRate !== rate) {
+      this._stopPlayer()
+      this.player = new Pcm16Player(rate)
+      void this.player.start()
+    }
+    return this.player
+  }
+
   private _handleEvent(msg: { type: string }): void {
     switch (msg.type) {
       case 'session_started':
@@ -135,9 +154,16 @@ export class VoiceClient {
         this.options.onEvent({ type: 'transcript', from: t.from, text: t.text })
         break
       }
-      case 'audio_chunk':
-        this.options.onEvent({ type: 'audio_chunk' })
+      case 'audio_chunk': {
+        const a = msg as unknown as { data?: string; rate?: number }
+        const data = a.data ?? ''
+        const rate = a.rate ?? 24000
+        if (data) {
+          this._ensurePlayer(rate).push(data)
+        }
+        this.options.onEvent({ type: 'audio_chunk', data, rate })
         break
+      }
       case 'image': {
         const img = msg as unknown as { kind: 'cake' | 'dream' }
         this.options.onEvent({ type: 'image', kind: img.kind })
