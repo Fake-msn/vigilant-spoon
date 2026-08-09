@@ -30,7 +30,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${path}`
   const headers = new Headers(init.headers)
   const { token } = getSession()
-  if (token) headers.set('Authorization', `Bearer ${token}`)
+  // 平台网关会剥除 Authorization header，改用 X-Auth-Token 传递 token
+  console.log('[api-debug] path:', path, 'token:', token)
+  if (token) headers.set('X-Auth-Token', token)
 
   // FormData 需要浏览器自动设置带 boundary 的 Content-Type
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
@@ -42,6 +44,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     const code = body.code || 'UNKNOWN'
+    console.error('[api-debug] error:', res.status, code, body)
     if (res.status === 401) {
       throw handleUnauthorized(code)
     }
@@ -124,7 +127,8 @@ async function adminRequest<T>(path: string, init: RequestInit = {}): Promise<T>
   const url = `${API_BASE}${path}`
   const headers = new Headers(init.headers)
   const token = getAdminToken()
-  if (token) headers.set('Authorization', `Bearer ${token}`)
+  // 平台网关会剥除 Authorization header，改用 X-Auth-Token 传递 token
+  if (token) headers.set('X-Auth-Token', token)
   headers.set('Content-Type', 'application/json')
 
   const res = await fetch(url, { ...init, headers })
