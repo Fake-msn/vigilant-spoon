@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
+import { DemoModeToggle } from '@/components/DemoModeToggle'
+import { DEMO } from '@/constants/demo'
 import { KidAvatar } from '@/components/art/KidAvatar'
 import { getSession, isStudentProfile, setSession } from '@/stores/session'
 
@@ -26,6 +28,36 @@ export function IdentityPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const preloadClass = (location.state as { preloadClass?: string } | null)?.preloadClass
+
+  // 挂载时如果带了 preloadClass，直接拉班级数据并进入 pick 步（仅首次）
+  useEffect(() => {
+    if (!preloadClass) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        setLoading(true)
+        const cls = await api.getClass(preloadClass)
+        if (cancelled) return
+        setCode(preloadClass)
+        setClassName(cls.class_name)
+        setStudents(cls.students)
+        const defaultStudent = cls.students.find((s) => s.name === DEMO.STUDENT) ?? null
+        setSelected(defaultStudent?.id ?? null)
+        setStep('pick')
+        setError(null)
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : '加载演示班级失败')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const filtered = useMemo(
     () => students.filter((s) => !keyword.trim() || s.name.includes(keyword.trim())),
     [keyword, students],
@@ -37,7 +69,7 @@ export function IdentityPage() {
     return <Navigate to={target} replace />
   }
 
-  const submitCode = async () => {
+  const submitCode = useCallback(async () => {
     setError(null)
     setLoading(true)
     try {
@@ -50,7 +82,7 @@ export function IdentityPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [code])
 
   const enter = async () => {
     if (!selected) return
@@ -71,6 +103,7 @@ export function IdentityPage() {
 
   return (
     <div className="relative mx-auto w-full max-w-[1760px] overflow-x-clip px-6 py-10 lg:px-10">
+      <DemoModeToggle variant="navigate-home" />
       <img src="/design/leaves.png" alt="" aria-hidden className="pointer-events-none absolute -right-10 -top-6 hidden w-72 opacity-70 lg:block" />
       <img src="/design/cloud.png" alt="" aria-hidden className="pointer-events-none absolute -left-24 bottom-0 hidden w-72 opacity-40 lg:block" />
 
