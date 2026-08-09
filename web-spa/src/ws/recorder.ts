@@ -20,6 +20,8 @@ export class Pcm16Recorder {
     this.onChunk = onChunk
   }
 
+  private chunkCount = 0
+
   async start(): Promise<void> {
     if (this.stream) return
 
@@ -33,8 +35,13 @@ export class Pcm16Recorder {
     })
 
     this.ctx = new AudioContext({ sampleRate: TARGET_SAMPLE_RATE })
+    // 某些浏览器创建后为 suspended，需手动 resume 才会触发 onaudioprocess
+    if (this.ctx.state === 'suspended') {
+      await this.ctx.resume()
+    }
     // 若浏览器未按 16kHz 打开，用 ratio 重采样
     this.ratio = TARGET_SAMPLE_RATE / this.ctx.sampleRate
+    console.log('[recorder] started, ctx.rate=', this.ctx.sampleRate, 'ratio=', this.ratio, 'state=', this.ctx.state)
 
     this.source = this.ctx.createMediaStreamSource(this.stream)
     this.processor = this.ctx.createScriptProcessor(4096, 1, 1)
@@ -42,7 +49,13 @@ export class Pcm16Recorder {
     this.processor.onaudioprocess = (e) => {
       const input = e.inputBuffer.getChannelData(0)
       const pcm16 = this._resampleAndConvert(input)
-      if (pcm16.length > 0) this.onChunk(pcm16)
+      if (pcm16.length > 0) {
+        this.chunkCount++
+        if (this.chunkCount % 20 === 1) {
+          console.log('[recorder] onaudioprocess chunk=', this.chunkCount, 'len=', pcm16.length)
+        }
+        this.onChunk(pcm16)
+      }
     }
 
     this.source.connect(this.processor)

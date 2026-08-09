@@ -20,6 +20,10 @@ logger = logging.getLogger("voice_ws")
 
 router = APIRouter(tags=["voice"])
 
+# 调试日志文件，用于确认前端音频是否到达后端
+import os
+_DEBUG_LOG = os.path.join(os.path.dirname(__file__), "..", "..", "data", "voice_debug.log")
+
 # WebSocket 私有关闭码：4401=未认证/Token 无效，4409=学生身份不匹配
 CLOSE_UNAUTHORIZED = 4401
 CLOSE_FORBIDDEN = 4409
@@ -98,17 +102,27 @@ async def voice_websocket(websocket: WebSocket) -> None:
             stop_event.set()
 
     async def _receive_loop() -> None:
+        audio_count = 0
+        audio_bytes = 0
+        _log = open(_DEBUG_LOG, "a", encoding="utf-8")
+        _log.write(f"\n=== [{datetime.now(timezone.utc)}] session started student={student_id} ===\n")
+        _log.flush()
         try:
             while not stop_event.is_set():
                 raw = await websocket.receive()
                 if "bytes" in raw:
                     pcm16 = raw["bytes"]
-                    print(f"[VOICE-DEBUG] receive bytes: {len(pcm16)}", flush=True)
+                    audio_count += 1
+                    audio_bytes += len(pcm16)
+                    if audio_count % 10 == 1:
+                        _log.write(f"[{datetime.now(timezone.utc)}] audio chunk #{audio_count}: {len(pcm16)} bytes (total {audio_bytes})\n")
+                        _log.flush()
                     if isinstance(pcm16, bytes):
                         provider.send_audio(pcm16)
                 elif "text" in raw:
                     text = raw["text"]
-                    print(f"[VOICE-DEBUG] receive text: {text[:40]}", flush=True)
+                    _log.write(f"[{datetime.now(timezone.utc)}] text: {text[:80]}\n")
+                    _log.flush()
                     if isinstance(text, str):
                         try:
                             msg = json.loads(text)
@@ -124,6 +138,8 @@ async def voice_websocket(websocket: WebSocket) -> None:
         except Exception:
             logger.exception("voice receive loop error")
         finally:
+            _log.write(f"=== session ended: audio_chunks={audio_count} audio_bytes={audio_bytes} ===\n")
+            _log.close()
             stop_event.set()
 
     send_task = asyncio.create_task(_send_loop())

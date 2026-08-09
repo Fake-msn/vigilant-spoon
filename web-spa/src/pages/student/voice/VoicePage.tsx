@@ -57,14 +57,41 @@ export function VoicePage() {
   const [dream, setDream] = useState<'none' | 'cake' | 'dream'>('none')
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const clientRef = useRef<VoiceClient | null>(null)
+  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const aiDraftIndexRef = useRef<number | null>(null)
+
+  const clearStopTimer = () => {
+    if (stopTimerRef.current) {
+      clearTimeout(stopTimerRef.current)
+      stopTimerRef.current = null
+    }
+  }
 
   const handleEvent = (event: VoiceEvent) => {
+    console.log('[voice] event:', event.type, event)
     switch (event.type) {
-      case 'transcript':
-        setMsgs((prev) => [...prev, { from: event.from, text: event.text }])
+      case 'transcript': {
+        if (event.from === 'me') {
+          // 用户语音转录，作为一条独立消息
+          setMsgs((prev) => [...prev, { from: 'me', text: event.text }])
+          break
+        }
+        // AI 回复是 delta 片段流，累积到同一条消息中，避免刷屏
+        setMsgs((prev) => {
+          const idx = aiDraftIndexRef.current
+          if (idx !== null && idx >= 0 && idx < prev.length && prev[idx].from === 'ai') {
+            const next = [...prev]
+            next[idx] = { ...next[idx], text: next[idx].text + event.text }
+            return next
+          }
+          aiDraftIndexRef.current = prev.length
+          return [...prev, { from: 'ai', text: event.text }]
+        })
         break
+      }
       case 'image':
         setDream(event.kind)
         break
@@ -78,9 +105,15 @@ export function VoicePage() {
         setPhase('speaking')
         break
       case 'turn_end':
+        clearStopTimer()
+        aiDraftIndexRef.current = null
         setPhase('idle')
         break
+      case 'session_started':
+        setSessionReady(true)
+        break
       case 'session_end':
+        setSessionReady(false)
         break
     }
   }
@@ -107,11 +140,27 @@ export function VoicePage() {
 
   const talk = async () => {
     if (phase !== 'idle') return
-    await clientRef.current?.startTurn()
+    // 本地立即进入聆听态，避免等服务端 vad_start 迟迟无反馈
+    setPhase('listening')
+    try {
+      await clientRef.current?.startTurn()
+    } catch (err) {
+      // 麦克风权限被拒、服务未就绪或启动失败，回退到 idle
+      console.error('[voice] startTurn failed:', err)
+      setPhase('idle')
+    }
   }
 
   const stopTalk = () => {
+    // 本地立即退出聆听态，交还 AI 等待，避免卡在"正在输入"
+    setPhase('thinking')
     clientRef.current?.stopTurn()
+    // 兜底：若服务端迟迟不回 turn_end，强制回到 idle，避免 UI 卡死
+    clearStopTimer()
+    stopTimerRef.current = setTimeout(() => {
+      setPhase('idle')
+      stopTimerRef.current = null
+    }, 8000)
   }
 
   const reset = () => {
@@ -128,6 +177,8 @@ export function VoicePage() {
     })
     client.connect()
     clientRef.current = client
+    aiDraftIndexRef.current = null
+    setSessionReady(false)
     setMsgs([])
     setPhase('idle')
     setDream('none')
@@ -246,7 +297,7 @@ export function VoicePage() {
                 <>
                   <button
                     onClick={phase === 'listening' ? stopTalk : talk}
-                    disabled={phase === 'thinking' || phase === 'speaking'}
+                    disabled={phase === 'thinking' || phase === 'speaking' || !sessionReady}
                     aria-label={phase === 'listening' ? '点击结束说话' : '点击开始说话'}
                     className={`flex h-18 w-18 items-center justify-center rounded-full text-white transition-all ${
                       phase === 'listening'
@@ -258,13 +309,15 @@ export function VoicePage() {
                     <Icon name={phase === 'listening' ? 'square' : 'mic'} size={30} />
                   </button>
                   <p className="text-sm font-medium text-ink-soft">
-                    {phase === 'listening'
-                      ? '我在听，说完点按钮…'
-                      : phase === 'thinking'
-                        ? '小信正在想…'
-                        : phase === 'speaking'
-                          ? '小信在说…'
-                          : '点击麦克风，告诉小信你的梦想吧'}
+                    {!sessionReady
+                      ? '小信准备中…'
+                      : phase === 'listening'
+                        ? '我在听，说完点按钮…'
+                        : phase === 'thinking'
+                          ? '小信正在想…'
+                          : phase === 'speaking'
+                            ? '小信在说…'
+                            : '点击麦克风，告诉小信你的梦想吧'}
                   </p>
                 </>
               ) : (
