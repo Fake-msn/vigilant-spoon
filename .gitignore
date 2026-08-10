@@ -16,3 +16,7 @@ server/app/static/
 # 运行时本地数据库（可随时 seed 重建）
 server/data/
 server/app.db
+# Python 虚拟环境
+server/.venv/
+# 头像上传运行时目录
+server/app/static/avatars/

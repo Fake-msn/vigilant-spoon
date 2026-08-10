@@ -1,0 +1,77 @@
+version: 2.1
+
+# CI 审核：后端 (Python) + 前端 SPA (Vite/React)
+# 对应原 deploy-xiaoxin/.github/workflows/ci.yml 的能力，迁移到 CircleCI。
+# 触发：所有分支 push；便于在合并到 master 前对 feat 分支统一审核。
+
+jobs:
+  backend:
+    name: Backend (Python)
+    docker:
+      - image: cimg/python:3.10
+    working_directory: ~/repo/server
+    steps:
+      - checkout:
+          path: ~/repo
+      - restore_cache:
+          keys:
+            - pip-{{ checksum "pyproject.toml" }}
+      - run:
+          name: Install dependencies
+          command: |
+            python -m pip install --upgrade pip \
+              --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+              --extra-index-url https://pypi.org/simple
+            python -m pip install -e ".[dev]" \
+              --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+              --extra-index-url https://pypi.org/simple
+      - save_cache:
+          key: pip-{{ checksum "pyproject.toml" }}
+          paths:
+            - ~/.cache/pip
+      - run:
+          name: Lint (ruff)
+          command: python -m ruff check .
+      - run:
+          name: Type check (mypy)
+          command: python -m mypy app
+      - run:
+          name: Test (pytest)
+          command: python -m pytest
+
+  web-spa:
+    name: Web SPA (Vite)
+    docker:
+      - image: cimg/node:20.13
+    working_directory: ~/repo/web-spa
+    steps:
+      - checkout:
+          path: ~/repo
+      - restore_cache:
+          keys:
+            - npm-{{ checksum "package-lock.json" }}
+      - run:
+          name: Install dependencies
+          command: npm ci
+      - save_cache:
+          key: npm-{{ checksum "package-lock.json" }}
+          paths:
+            - ~/.npm
+      - run:
+          name: Lint (eslint)
+          command: npm run lint
+      - run:
+          name: Type check (tsc)
+          command: npm run typecheck
+      - run:
+          name: Test (vitest)
+          command: npm test
+      - run:
+          name: Build (vite)
+          command: npm run build
+
+workflows:
+  ci:
+    jobs:
+      - backend
+      - web-spa
