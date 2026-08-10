@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import secrets
 import sqlite3
 from datetime import datetime
@@ -20,6 +21,7 @@ from app.schemas import (
     StudentProfile,
 )
 from app.schemas.common import ErrorEnvelope
+from app.services.pet import species_for_ideal
 
 router = APIRouter(prefix="/classes", tags=["classes"])
 
@@ -72,13 +74,16 @@ def create_class(req: ClassCreateReq) -> ClassCreateResp:
         region_name = REGION_NAMES.get(req.region_key, req.region_key)
 
         conn.execute(
-            "INSERT INTO classes (class_code, class_name, school, region_key, grade, class_no) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO classes (class_code, class_name, school, region_key, city, county, town, grade, class_no) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 code,
                 req.class_name,
                 req.school,
                 req.region_key,
+                req.city,
+                req.county,
+                req.town,
                 req.grade,
                 req.class_no,
             ),
@@ -103,6 +108,44 @@ def create_class(req: ClassCreateReq) -> ClassCreateResp:
                     "member",
                 ),
             )
+            # 为新学生初始化成长档案记录，避免访问成长页时出现"学生不存在"
+            species = species_for_ideal(s.ideal)
+            conn.execute(
+                """
+                INSERT INTO growth_records (
+                    student_id, ideal, commitments, actions, history, stage,
+                    pet_state, last_gist, needs_care, teacher_constraints,
+                    state, signal, growth_value, species, pet_stage,
+                    last_growth_at, cheer_until, portrait_url,
+                    points_total, level, hunger, mood, last_points_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    student_id,
+                    s.ideal,
+                    json.dumps([], ensure_ascii=False),
+                    json.dumps([], ensure_ascii=False),
+                    json.dumps([], ensure_ascii=False),
+                    "egg",
+                    None,
+                    None,
+                    0,
+                    None,
+                    "daily",
+                    None,
+                    0,
+                    species,
+                    0,
+                    None,
+                    None,
+                    None,
+                    0,
+                    1,
+                    50,
+                    60,
+                    None,
+                ),
+            )
             profiles.append(
                 StudentProfile(
                     id=student_id,
@@ -116,6 +159,41 @@ def create_class(req: ClassCreateReq) -> ClassCreateResp:
                     region_name=region_name,
                     ideal=s.ideal,
                 )
+            )
+
+            # 为新学生插入一封导引信，介绍班宠与语音对话功能
+            welcome_title = "欢迎来到小信的成长乐园"
+            welcome_body = (
+                f"亲爱的{s.name}同学：\n\n"
+                "你好呀！我是小信，从今天起我会一直陪着你在成长乐园里探险。\n\n"
+                "在这里，你拥有一只专属的梦想小宠物。它现在还是一颗小小的蛋，"
+                "会随着你的每一次努力慢慢长大——你认真听课、主动举手、完成承诺，"
+                "它都会获得成长值，慢慢破壳、发芽、开花。\n\n"
+                "它也会有自己的心情：开心的时候会蹦蹦跳跳，想念你的时候会变得没精神。"
+                "记得常来看看它，和它分享你的新故事。\n\n"
+                "想让它快快长大吗？点击页面上的「去和小信聊聊」按钮，和我语音说说话吧！"
+                "你可以告诉我你的梦想、你这周开心的事，或者任何你想分享的故事。"
+                "我会认真听，然后给你的小宠物加上成长值。\n\n"
+                "期待在成长乐园里见到你！\n\n"
+                "一直陪着你的\n"
+                "小信"
+            )
+            now_dt = datetime.now()
+            conn.execute(
+                "INSERT INTO letters "
+                "(letter_id, student_id, title, date, preview, body, generated_at, source, is_read) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    f"{student_id}-welcome",
+                    student_id,
+                    welcome_title,
+                    now_dt.strftime("%Y-%m-%d"),
+                    "欢迎来到成长乐园！点击这封信了解你的梦想小宠物吧",
+                    welcome_body,
+                    now_dt.isoformat(),
+                    "template",
+                    0,
+                ),
             )
 
         conn.commit()
@@ -146,7 +224,7 @@ def get_class(class_code: str) -> ClassInfo:
             raise _class_not_found(class_code)
 
         student_rows = conn.execute(
-            "SELECT student_id, name, student_no, grade, avatar_seed, role, ideal "
+            "SELECT student_id, name, student_no, grade, avatar_seed, role, ideal, custom_avatar_url "
             "FROM students WHERE class_code = ? ORDER BY student_no",
             (class_code,),
         ).fetchall()
@@ -164,6 +242,7 @@ def get_class(class_code: str) -> ClassInfo:
                 region_key=class_row["region_key"],
                 region_name=region_name,
                 ideal=row["ideal"],
+                custom_avatar_url=row["custom_avatar_url"] if "custom_avatar_url" in row.keys() else None,
             )
             for row in student_rows
         ]

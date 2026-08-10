@@ -301,6 +301,9 @@ export const mockClient = {
     class_name: string
     school: string
     region_key: string
+    city?: string
+    county?: string
+    town?: string
     grade: string
     class_no: string
     students: { name: string; grade: string; avatar_seed: number; ideal?: string }[]
@@ -566,6 +569,10 @@ export const mockClient = {
           class_code: 'LTZ2024',
           class_name: '三（1）班',
           school: '龙头山镇中心小学',
+          region_key: 'yunnan',
+          city: '昭通市',
+          county: '鲁甸县',
+          town: '龙头山镇',
           grade: '三年级',
           class_no: '1',
         },
@@ -686,6 +693,28 @@ export const mockClient = {
       actions: null,
       history: flavor.history,
     }
+  },
+
+  async updateCommitments(
+    studentId: string,
+    commitments: { id: string; text: string; created_at?: string | null; status: 'active' | 'fulfilled' | 'expired' }[],
+  ) {
+    await delay(200)
+    const now = new Date().toISOString()
+    return commitments
+      .filter((c) => c && c.text && c.text.trim().length > 0)
+      .map((c, idx, arr) => {
+        // 基于 id 去重（只保留最后一个）
+        const lastIdx = arr.findIndex((x) => x.id === c.id)
+        if (lastIdx !== arr.indexOf(c)) return null
+        return {
+          id: c.id,
+          text: c.text.trim(),
+          created_at: c.created_at || now,
+          status: c.status as 'active' | 'fulfilled' | 'expired',
+        }
+      })
+      .filter(Boolean) as { id: string; text: string; created_at: string; status: 'active' | 'fulfilled' | 'expired' }[]
   },
 
   async getPet(studentId: string) {

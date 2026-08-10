@@ -9,6 +9,10 @@ type TeacherClass = {
   class_code: string
   class_name: string
   school: string
+  region_key?: string
+  city?: string
+  county?: string
+  town?: string
   grade: string
   class_no: string
 }

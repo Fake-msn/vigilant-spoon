@@ -181,7 +181,7 @@ def enter(req: EnterReq) -> EnterResp:
             raise _class_not_found(req.class_code)
 
         student_row = conn.execute(
-            "SELECT student_id, name, student_no, grade, avatar_seed, role, ideal "
+            "SELECT student_id, name, student_no, grade, avatar_seed, role, ideal, custom_avatar_url "
             "FROM students WHERE class_code = ? AND name = ?",
             (req.class_code, req.student_name),
         ).fetchone()
@@ -200,6 +200,7 @@ def enter(req: EnterReq) -> EnterResp:
             region_key=class_row["region_key"],
             region_name=region_name,
             ideal=student_row["ideal"],
+            custom_avatar_url=student_row["custom_avatar_url"] if "custom_avatar_url" in student_row.keys() else None,
         )
 
         token = _issue_token()
@@ -412,7 +413,7 @@ def teacher_classes(user: CurrentUser = Depends(get_current_user)) -> TeacherCla
             teacher_school = _as_str(teacher["school"])
 
         rows = conn.execute(
-            "SELECT cl.class_code, cl.class_name, cl.school, cl.grade, cl.class_no "
+            "SELECT cl.class_code, cl.class_name, cl.school, cl.region_key, cl.city, cl.county, cl.town, cl.grade, cl.class_no "
             "FROM teacher_classes tc "
             "JOIN classes cl ON cl.class_code = tc.class_code "
             "WHERE tc.teacher_id = ? ORDER BY tc.assigned_at DESC",
@@ -424,6 +425,10 @@ def teacher_classes(user: CurrentUser = Depends(get_current_user)) -> TeacherCla
                 class_code=_as_str(r["class_code"]),
                 class_name=_as_str(r["class_name"]),
                 school=_as_str(r["school"]),
+                region_key=_as_str(r["region_key"]),
+                city=_as_str(r["city"]),
+                county=_as_str(r["county"]),
+                town=_as_str(r["town"]),
                 grade=_as_str(r["grade"]),
                 class_no=_as_str(r["class_no"]),
             )

@@ -18,7 +18,25 @@ export const kidVariants: KidVariant[] = [
   { bg: '#fee2e2', hair: '#3f3f46', shirt: '#f87171', style: 'pigtails' },
 ];
 
-export function KidAvatar({ avatarSeed, size = 96 }: { avatarSeed: number; size?: number }) {
+export function KidAvatar({ avatarSeed, size = 96, customAvatarUrl }: { avatarSeed: number; size?: number; customAvatarUrl?: string | null }) {
+  // 如果有自定义头像 URL，渲染 <img> 而非 SVG
+  if (customAvatarUrl) {
+    return (
+      <img
+        src={customAvatarUrl}
+        alt="学生头像"
+        width={size}
+        height={size}
+        className="rounded-xl object-cover"
+        style={{ width: size, height: size }}
+        onError={(e) => {
+          // 加载失败时回退到 SVG（隐藏 img）
+          (e.currentTarget as HTMLImageElement).style.display = 'none'
+        }}
+      />
+    )
+  }
+
   const v = kidVariants[Math.abs(avatarSeed) % kidVariants.length];
   const skin = v.skin ?? '#ffd9b3';
   return (

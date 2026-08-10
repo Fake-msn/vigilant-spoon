@@ -15,6 +15,21 @@ class Commitment(BaseModel):
     status: Literal["active", "fulfilled", "expired"] = Field(..., description="承诺状态")
 
 
+class CommitmentInput(BaseModel):
+    """教师端编辑承诺时使用的入力结构（创建时间可缺省，服务器自动补齐）。"""
+
+    id: str = Field(..., description="承诺 ID，前端生成的唯一字符串")
+    text: str = Field(..., min_length=1, description="承诺内容")
+    created_at: datetime | None = Field(default=None, description="创建时间（空=当下）")
+    status: Literal["active", "fulfilled", "expired"] = Field(default="active", description="承诺状态")
+
+
+class CommitmentsPatch(BaseModel):
+    """教师端全量替换学生承诺列表的请求体。"""
+
+    commitments: list[CommitmentInput] = Field(..., description="完整承诺列表（覆盖写入）")
+
+
 class PetState(BaseModel):
     """宠物状态（v2.1 三态，A1）。"""
 

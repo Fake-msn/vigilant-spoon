@@ -602,6 +602,9 @@ CREATE TABLE IF NOT EXISTS classes (
     class_name TEXT NOT NULL,
     school TEXT NOT NULL,
     region_key TEXT NOT NULL,
+    city TEXT NOT NULL DEFAULT '',
+    county TEXT NOT NULL DEFAULT '',
+    town TEXT NOT NULL DEFAULT '',
     grade TEXT NOT NULL,
     class_no TEXT NOT NULL
 );

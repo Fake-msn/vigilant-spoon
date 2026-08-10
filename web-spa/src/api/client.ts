@@ -154,6 +154,9 @@ export const realClient = {
     class_name: string
     school: string
     region_key: string
+    city?: string
+    county?: string
+    town?: string
     grade: string
     class_no: string
     students: { name: string; grade: string; avatar_seed: number; ideal?: string }[]
@@ -195,7 +198,7 @@ export const realClient = {
     teacher_id: string
     name: string
     school: string
-    classes: { class_code: string; class_name: string; school: string; grade: string; class_no: string }[]
+    classes: { class_code: string; class_name: string; school: string; region_key: string; city: string; county: string; town: string; grade: string; class_no: string }[]
   }>(`/session/teacher/classes`),
   teacherSwitch: (classCode: string) => {
     const $code = normalizeClassCode(classCode)
@@ -267,6 +270,10 @@ export const realClient = {
     actions: unknown[] | null
     history: unknown[] | null
   }>(`/students/${encodeURIComponent(studentId)}/growth?view=full`),
+  updateCommitments: (studentId: string, commitments: { id: string; text: string; created_at?: string | null; status: 'active' | 'fulfilled' | 'expired' }[]) => request<{ id: string; text: string; created_at: string; status: 'active' | 'fulfilled' | 'expired' }[]>(`/students/${encodeURIComponent(studentId)}/commitments`, {
+    method: 'PATCH',
+    body: JSON.stringify({ commitments }),
+  }),
   getPet: (studentId: string) => request<{
     species: string
     stage: number
@@ -281,6 +288,14 @@ export const realClient = {
   createPortrait: (studentId: string, idempotencyKey?: string) => request<{ job_id: string }>(`/students/${encodeURIComponent(studentId)}/pet/portrait`, {
     method: 'POST',
     headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+  }),
+  uploadAvatar: (studentId: string, file: File) => request<{ avatar_url: string }>(`/students/${encodeURIComponent(studentId)}/avatar`, {
+    method: 'POST',
+    body: (() => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return fd
+    })(),
   }),
   getJob: (jobId: string) => request<{
     job_id: string
@@ -580,6 +595,19 @@ export const realClient = {
     note: string | null
     created_at: string
   }[]>(`/students/${encodeURIComponent(studentId)}/points`),
+  getLetters: (studentId: string) => request<{
+    letter_id: string
+    student_id: string
+    title: string
+    body: string
+    generated_at: string
+    source: 'template' | 'llm'
+    is_read: boolean
+  }[]>(`/students/${encodeURIComponent(studentId)}/letters`),
+  generateLetter: (studentId: string) => request<{ job_id: string }>(
+    `/students/${encodeURIComponent(studentId)}/letters/generate`,
+    { method: 'POST' },
+  ),
 
   // 方案 5.3 管理员后台
   adminLogin: async (password: string) => {

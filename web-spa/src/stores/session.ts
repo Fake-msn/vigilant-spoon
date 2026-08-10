@@ -7,6 +7,7 @@ export type Profile = {
   student_no: string
   avatar_seed: number
   ideal?: string
+  custom_avatar_url?: string
   class_code: string
   region_key: RegionKey
   region_name: string
@@ -120,6 +121,7 @@ const STUDENT_FIELDS: (keyof Profile)[] = [
   'region_key',
   'region_name',
 ]
+
 const TEACHER_FIELDS: (keyof TeacherProfile)[] = [
   'id',
   'name',

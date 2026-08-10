@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { growthRows, type PetState } from '@/mocks/data'
 import { Icon } from '@/components/Icon'
+import { StudentLogoutButton } from '@/components/StudentLogoutButton'
 import { PixelArt } from '@/components/art/PixelArt'
 import { cakeMap, cakePalette } from '@/components/art/pixelData'
 import { PetSprite } from '@/components/art/PetSprite'
@@ -196,13 +197,17 @@ export function VoicePage() {
 
   return (
     <div className="mx-auto w-full max-w-[1760px] px-6 pb-10 pt-6 lg:px-10">
-      <Link
-        to="/student"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft transition-colors hover:text-brand"
-      >
-        <Icon name="arrow-left" size={16} />
-        返回主页
-      </Link>
+      {/* 顶部操作栏：返回主页 + 左上角退出登录 */}
+      <div className="flex items-center justify-between">
+        <Link
+          to="/student"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft transition-colors hover:text-brand"
+        >
+          <Icon name="arrow-left" size={16} />
+          返回主页
+        </Link>
+        <StudentLogoutButton />
+      </div>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[2.4fr_1fr]">
         {/* 左：对话区 */}
