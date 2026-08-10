@@ -2,7 +2,7 @@
 FROM node:20-slim AS frontend
 WORKDIR /build
 COPY web-spa/package.json web-spa/package-lock.json ./
-RUN npm ci
+RUN npm config set registry https://registry.npmmirror.com && npm ci
 COPY web-spa/ ./
 RUN npm run build
 
@@ -10,9 +10,9 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 
-# 安装后端依赖（从 pyproject.toml，安装 app 包）
+# 安装后端依赖（从 pyproject.toml，安装 app 包），使用清华镜像加速
 COPY server/ ./server/
-RUN pip install --no-cache-dir ./server
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple ./server
 
 # 拷贝构建好的前端静态产物
 COPY --from=frontend /build/dist /app/webspa-dist
