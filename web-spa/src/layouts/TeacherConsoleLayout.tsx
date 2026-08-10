@@ -1,7 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from '@/components/Icon'
 import { TeacherAvatar } from '@/components/art/TeacherAvatar'
-import { clearSession, getSession, isStudentProfile } from '@/stores/session'
+import { SESSION_CHANGE_EVENT, clearSession, getSession, isStudentProfile } from '@/stores/session'
 
 const nav = [
   { href: '/teacher/lesson', icon: 'plus' as const, label: '新建课程', desc: '创设课堂语境' },
@@ -13,6 +14,14 @@ const nav = [
 export function TeacherConsoleLayout() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
+  // 订阅会话变更事件：当班级切换/登录/登出时，setSession/clearSession 会派发事件，
+  // 侧栏头像卡的姓名、学校、班级信息借此自动刷新，无需父/子组件间跳转 hack
+  const [, setSessionTick] = useState(0)
+  useEffect(() => {
+    const handler = () => setSessionTick((n) => n + 1)
+    window.addEventListener(SESSION_CHANGE_EVENT, handler)
+    return () => window.removeEventListener(SESSION_CHANGE_EVENT, handler)
+  }, [])
   const { profile } = getSession()
 
   if (!profile || isStudentProfile(profile)) {

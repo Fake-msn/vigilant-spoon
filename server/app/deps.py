@@ -3,8 +3,7 @@
 from datetime import datetime, timezone
 from typing import Literal, NamedTuple
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import HTTPException, Request, status
 
 from app.db import get_db_connection
 from app.schemas import ErrorEnvelope
@@ -13,7 +12,21 @@ from app.schemas import ErrorEnvelope
 def _as_str(value: object) -> str:
     return str(value)
 
-security = HTTPBearer(auto_error=False)
+
+def _extract_token(request: Request) -> str | None:
+    """从请求中提取访问令牌。
+
+    魔塔社区创空间平台网关会剥除 `Authorization` header，因此优先从
+    自定义 header `X-Auth-Token` 读取；兼容 `Authorization: Bearer <token>`
+    作为 fallback（本地直连等不含网关的场景）。
+    """
+    token = request.headers.get("x-auth-token")
+    if token:
+        return token.strip()
+    auth = request.headers.get("authorization")
+    if auth and auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return None
 
 
 class CurrentUser(NamedTuple):
@@ -32,14 +45,12 @@ def _unauthorized(code: str, message: str) -> HTTPException:
     )
 
 
-def get_current_student(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
-) -> str:
-    """Validate Bearer token against the sessions table."""
-    if credentials is None:
+def get_current_student(request: Request) -> str:
+    """Validate token against the sessions table."""
+    token = _extract_token(request)
+    if token is None:
         raise _unauthorized("TOKEN_INVALID", "登录已失效，请重新进入")
 
-    token = credentials.credentials
     if not token.startswith("st_"):
         raise _unauthorized("TOKEN_INVALID", "登录已失效，请重新进入")
 
@@ -61,14 +72,12 @@ def get_current_student(
         conn.close()
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
-) -> CurrentUser:
-    """Validate Bearer token against student or teacher sessions."""
-    if credentials is None:
+def get_current_user(request: Request) -> CurrentUser:
+    """Validate token against student or teacher sessions."""
+    token = _extract_token(request)
+    if token is None:
         raise _unauthorized("TOKEN_INVALID", "登录已失效，请重新进入")
 
-    token = credentials.credentials
     if not token.startswith("st_"):
         raise _unauthorized("TOKEN_INVALID", "登录已失效，请重新进入")
 
@@ -107,14 +116,12 @@ def get_current_user(
         conn.close()
 
 
-def get_current_admin(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
-) -> str:
-    """Validate Bearer token against the admin_sessions table."""
-    if credentials is None:
+def get_current_admin(request: Request) -> str:
+    """Validate token against the admin_sessions table."""
+    token = _extract_token(request)
+    if token is None:
         raise _unauthorized("TOKEN_INVALID", "登录已失效，请重新进入")
 
-    token = credentials.credentials
     if not token.startswith("ad_"):
         raise _unauthorized("TOKEN_INVALID", "登录已失效，请重新进入")
 

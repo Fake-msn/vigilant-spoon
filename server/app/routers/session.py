@@ -21,6 +21,7 @@ from app.schemas import (
     TeacherClassView,
     TeacherEnterReq,
     TeacherEnterResp,
+    TeacherLoginReq,
     TeacherPasswordUpdateReq,
     TeacherProfile,
     TeacherRegisterReq,
@@ -144,6 +145,17 @@ def _teacher_rejected(reason: str) -> HTTPException:
     )
 
 
+def _teacher_no_classes(name: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=ErrorEnvelope(
+            code="TEACHER_NO_CLASSES",
+            message="该教师还没有任教班级，请先创建班级或让管理员添加班级关联",
+            details={"teacher_name": name},
+        ).model_dump(),
+    )
+
+
 AccountStatus = Literal["pending", "active", "rejected"]
 
 
@@ -169,7 +181,8 @@ def enter(req: EnterReq) -> EnterResp:
             raise _class_not_found(req.class_code)
 
         student_row = conn.execute(
-            "SELECT student_id, name, student_no, grade, avatar_seed, role, ideal "
+            "SELECT student_id, name, student_no, grade, "
+            "avatar_seed, role, ideal, custom_avatar_url "
             "FROM students WHERE class_code = ? AND name = ?",
             (req.class_code, req.student_name),
         ).fetchone()
@@ -188,6 +201,11 @@ def enter(req: EnterReq) -> EnterResp:
             region_key=class_row["region_key"],
             region_name=region_name,
             ideal=student_row["ideal"],
+            custom_avatar_url=(
+                student_row["custom_avatar_url"]
+                if "custom_avatar_url" in student_row.keys()
+                else None
+            ),
         )
 
         token = _issue_token()
@@ -295,6 +313,83 @@ def teacher_enter(req: TeacherEnterReq) -> TeacherEnterResp:
         conn.close()
 
 
+@router.post("/teacher/login", response_model=TeacherEnterResp)
+def teacher_login(req: TeacherLoginReq) -> TeacherEnterResp:
+    """教师登录（不指定班级）：校验账号已注册（可选密码），默认进入任教时间最新的班级。"""
+    conn = get_db_connection()
+    try:
+        teacher_id = f"teacher-{req.teacher_name}"
+        teacher_row = conn.execute(
+            "SELECT name, school, password_hash, status, reject_reason "
+            "FROM teachers WHERE teacher_id = ?",
+            (teacher_id,),
+        ).fetchone()
+        if teacher_row is None:
+            raise _teacher_not_registered(req.teacher_name)
+
+        account_status = _as_str(teacher_row["status"]) or "active"
+        if account_status == "pending":
+            raise _teacher_pending_review()
+        if account_status == "rejected":
+            raise _teacher_rejected(_as_str(teacher_row["reject_reason"]))
+
+        stored_hash = _as_str(teacher_row["password_hash"])
+        if stored_hash:
+            if not req.password or not _verify_password(req.password, stored_hash):
+                raise _wrong_password()
+
+        # 取教师任教的班级（按最近分配时间优先）
+        class_rows = conn.execute(
+            "SELECT cl.class_code, cl.class_name, cl.school, cl.region_key "
+            "FROM teacher_classes tc "
+            "JOIN classes cl ON cl.class_code = tc.class_code "
+            "WHERE tc.teacher_id = ? ORDER BY tc.assigned_at DESC LIMIT 1",
+            (teacher_id,),
+        ).fetchall()
+        if not class_rows:
+            raise _teacher_no_classes(req.teacher_name)
+        class_row = class_rows[0]
+
+        region_name = REGION_NAMES.get(class_row["region_key"], class_row["region_key"])
+        profile = TeacherProfile(
+            id=teacher_id,
+            name=_as_str(teacher_row["name"]) or req.teacher_name,
+            role="teacher",
+            class_code=class_row["class_code"],
+            class_name=class_row["class_name"],
+            school=_as_str(teacher_row["school"]) or class_row["school"],
+            region_key=class_row["region_key"],
+            region_name=region_name,
+        )
+
+        token = _issue_token()
+        issued_at = datetime.now(timezone.utc)
+        expires_at = issued_at + timedelta(hours=SESSION_TTL_HOURS)
+
+        conn.execute(
+            "INSERT INTO teacher_sessions "
+            "(token, teacher_id, name, class_code, issued_at, expires_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                token,
+                profile.id,
+                profile.name,
+                profile.class_code,
+                issued_at.isoformat(),
+                expires_at.isoformat(),
+            ),
+        )
+        conn.commit()
+
+        return TeacherEnterResp(
+            session_token=token,
+            profile=profile,
+            expires_at=expires_at,
+        )
+    finally:
+        conn.close()
+
+
 @router.get("/teacher/classes", response_model=TeacherClassesResp)
 def teacher_classes(user: CurrentUser = Depends(get_current_user)) -> TeacherClassesResp:
     """教师账号概览：返回教师本人信息与任教班级列表。"""
@@ -323,7 +418,8 @@ def teacher_classes(user: CurrentUser = Depends(get_current_user)) -> TeacherCla
             teacher_school = _as_str(teacher["school"])
 
         rows = conn.execute(
-            "SELECT cl.class_code, cl.class_name, cl.school, cl.grade, cl.class_no "
+            "SELECT cl.class_code, cl.class_name, cl.school, "
+            "cl.region_key, cl.city, cl.county, cl.town, cl.grade, cl.class_no "
             "FROM teacher_classes tc "
             "JOIN classes cl ON cl.class_code = tc.class_code "
             "WHERE tc.teacher_id = ? ORDER BY tc.assigned_at DESC",
@@ -335,6 +431,10 @@ def teacher_classes(user: CurrentUser = Depends(get_current_user)) -> TeacherCla
                 class_code=_as_str(r["class_code"]),
                 class_name=_as_str(r["class_name"]),
                 school=_as_str(r["school"]),
+                region_key=_as_str(r["region_key"]),
+                city=_as_str(r["city"]),
+                county=_as_str(r["county"]),
+                town=_as_str(r["town"]),
                 grade=_as_str(r["grade"]),
                 class_no=_as_str(r["class_no"]),
             )

@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
+import { DemoModeToggle } from '@/components/DemoModeToggle'
+import { DEMO } from '@/constants/demo'
 import { KidAvatar } from '@/components/art/KidAvatar'
 import { getSession, isStudentProfile, setSession } from '@/stores/session'
 
@@ -26,18 +28,51 @@ export function IdentityPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const locationState = (location.state as { presetClass?: string; preloadClass?: string; demoHighlight?: boolean; from?: string } | null) ?? null
+  // 兼容旧字段 preloadClass（LoginPage 演示入口）与新统一字段 presetClass（换同学入口等），都进入同一自动加载流程
+  // 统一大写 + 去空白，避免与存储的班级码大小写不匹配
+  const presetClass = (locationState?.presetClass ?? locationState?.preloadClass)?.trim().toUpperCase() || undefined
+  // 关键：是否默认高亮一位学生，仅看入口是否显式声明了 demoHighlight=true
+  // 不能按"班级码等于 LTZ2024"判断——因为正式模式用户手工输入 LTZ2024 后再切换同班同学，也不应该替 TA 选中任何人
+  const shouldHighlightDemo = locationState?.demoHighlight === true && presetClass === DEMO.CLASS
+
+  // 挂载时如果带了 presetClass（已登录学生切换同班同学 / 演示入口），直接拉班级数据并进入 pick 步（仅首次）
+  // 注意：演示模式才默认高亮王小雅；正式模式切换同班同学时不默认选，让用户自由挑选
+  useEffect(() => {
+    if (!presetClass) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        setLoading(true)
+        const cls = await api.getClass(presetClass)
+        if (cancelled) return
+        setCode(presetClass)
+        setClassName(cls.class_name)
+        setStudents(cls.students)
+        const defaultStudent = shouldHighlightDemo
+          ? cls.students.find((s) => s.name === DEMO.STUDENT) ?? null
+          : null
+        setSelected(defaultStudent?.id ?? null)
+        setStep('pick')
+        setError(null)
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : '加载班级失败，请重新输入班级码')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const filtered = useMemo(
     () => students.filter((s) => !keyword.trim() || s.name.includes(keyword.trim())),
     [keyword, students],
   )
 
-  const { profile } = getSession()
-  if (profile) {
-    const target = isStudentProfile(profile) ? '/student' : '/teacher'
-    return <Navigate to={target} replace />
-  }
-
-  const submitCode = async () => {
+  const submitCode = useCallback(async () => {
     setError(null)
     setLoading(true)
     try {
@@ -50,6 +85,13 @@ export function IdentityPage() {
     } finally {
       setLoading(false)
     }
+  }, [code])
+
+  // 已登录用户直接重定向（须在所有 Hook 之后，避免条件 return 违反 Hooks 规则）
+  const { profile } = getSession()
+  if (profile) {
+    const target = isStudentProfile(profile) ? '/student' : '/teacher'
+    return <Navigate to={target} replace />
   }
 
   const enter = async () => {
@@ -71,6 +113,7 @@ export function IdentityPage() {
 
   return (
     <div className="relative mx-auto w-full max-w-[1760px] overflow-x-clip px-6 py-10 lg:px-10">
+      <DemoModeToggle variant="navigate-home" />
       <img src="/design/leaves.png" alt="" aria-hidden className="pointer-events-none absolute -right-10 -top-6 hidden w-72 opacity-70 lg:block" />
       <img src="/design/cloud.png" alt="" aria-hidden className="pointer-events-none absolute -left-24 bottom-0 hidden w-72 opacity-40 lg:block" />
 
@@ -85,9 +128,12 @@ export function IdentityPage() {
           <div className="mt-8 space-y-4">
             <input
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="例如 LTZ2024"
               aria-label="班级码"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
               className="input-soft text-center uppercase tracking-widest"
             />
             {error && <p className="text-sm text-red-500">{error}</p>}

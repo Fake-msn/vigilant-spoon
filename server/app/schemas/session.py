@@ -23,6 +23,7 @@ class StudentProfile(BaseModel):
     region_key: str = Field(..., description="地区 key")
     region_name: str = Field(..., description="地区名称")
     ideal: str | None = Field(default=None, description="理想")
+    custom_avatar_url: str | None = Field(default=None, description="自定义头像 URL")
 
 
 class TeacherProfile(BaseModel):
@@ -66,6 +67,9 @@ class ClassCreateReq(BaseModel):
     class_name: str = Field(..., min_length=1, description="班级名称")
     school: str = Field(..., min_length=1, description="学校")
     region_key: str = Field(..., min_length=1, description="地区 key")
+    city: str = Field(default="", description="市/州")
+    county: str = Field(default="", description="区/县")
+    town: str = Field(default="", description="乡/镇")
     grade: str = Field(..., min_length=1, description="年级")
     class_no: str = Field(..., min_length=1, description="班级序号")
     students: list[StudentCreate] = Field(..., min_length=1, description="学生名单")
@@ -114,10 +118,17 @@ class EnterResp(BaseModel):
 
 
 class TeacherEnterReq(BaseModel):
-    """教师登录请求（可选密码）"""
+    """教师登录请求（指定班级 + 可选密码）"""
 
     class_code: str = Field(..., min_length=1, description="班级码")
     teacher_name: str = Field(default="李老师", min_length=1, description="教师姓名")
+    password: str | None = Field(default=None, description="密码（账号设置了密码时必填）")
+
+
+class TeacherLoginReq(BaseModel):
+    """不指定班级的教师登录请求（按姓名+密码校验，默认进入首个任教班级）"""
+
+    teacher_name: str = Field(..., min_length=1, description="教师姓名")
     password: str | None = Field(default=None, description="密码（账号设置了密码时必填）")
 
 
@@ -139,6 +150,10 @@ class TeacherClassView(BaseModel):
     class_code: str = Field(..., description="班级码")
     class_name: str = Field(..., description="班级名称")
     school: str = Field(..., description="学校")
+    region_key: str = Field(default="", description="地区标识（省级 key）")
+    city: str = Field(default="", description="市/州")
+    county: str = Field(default="", description="区/县")
+    town: str = Field(default="", description="乡/镇")
     grade: str = Field(..., description="年级")
     class_no: str = Field(..., description="班级序号")
 

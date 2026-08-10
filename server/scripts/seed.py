@@ -58,7 +58,7 @@ STUDENTS: list[dict[str, Any]] = [
         "name": "张小花",
         "grade": "三年级",
         "student_no": "2023003",
-        "ideal": None,
+        "ideal": "画家",
         "avatar_seed": 2,
         "role": "member",
     },
@@ -193,14 +193,55 @@ ACADEMIC_RECORDS: list[dict[str, Any]] = [
 ]
 
 def _species_for(ideal: str | None) -> str:
-    mapping = {
-        "蛋糕师": "baker",
-        "军人": "soldier",
-        "科学家": "scientist",
-        "教师": "teacher",
-        "医生": "doctor",
+    """与 app/services/pet.py::species_for_ideal 保持一致。"""
+    text = (ideal or "").strip()
+    if not text:
+        return "sprout"
+    exact = {
+        "蛋糕师": "baker", "烘焙师": "baker",
+        "军人": "soldier", "解放军": "soldier", "士兵": "soldier",
+        "科学家": "scientist", "天文学家": "scientist", "发明家": "scientist",
+        "教师": "teacher", "老师": "teacher",
+        "医生": "doctor", "护士": "doctor",
+        "画家": "painter", "艺术家": "painter",
+        "警察": "police", "警官": "police", "民警": "police",
+        "消防员": "firefighter",
+        "飞行员": "pilot", "机长": "pilot",
+        "宇航员": "astronaut", "航天员": "astronaut",
+        "工程师": "engineer",
+        "音乐家": "musician", "歌手": "musician", "钢琴家": "musician",
+        "运动员": "athlete",
+        "作家": "writer", "小说家": "writer", "诗人": "writer", "作者": "writer",
     }
-    return mapping.get(ideal or "", "cat")
+    if text in exact:
+        return exact[text]
+    rules = [
+        ("蛋糕", "baker"), ("烘焙", "baker"), ("面包", "baker"), ("甜点", "baker"),
+        ("警察", "police"), ("警官", "police"), ("民警", "police"), ("公安", "police"),
+        ("消防", "firefighter"), ("灭火", "firefighter"),
+        ("飞行员", "pilot"), ("机长", "pilot"), ("开飞机", "pilot"),
+        ("宇航", "astronaut"), ("太空", "astronaut"), ("航天", "astronaut"), ("火箭", "astronaut"),
+        ("工程师", "engineer"), ("建筑", "engineer"), ("修路", "engineer"),
+        ("造桥", "engineer"), ("机械", "engineer"), ("建造", "engineer"),
+        ("音乐", "musician"), ("歌手", "musician"), ("钢琴", "musician"),
+        ("小提琴", "musician"), ("作曲", "musician"), ("唱歌", "musician"), ("演奏", "musician"),
+        ("运动员", "athlete"), ("跑步", "athlete"), ("足球", "athlete"),
+        ("篮球", "athlete"), ("奥运", "athlete"), ("冠军", "athlete"), ("体育", "athlete"),
+        ("作家", "writer"), ("写作", "writer"), ("作者", "writer"),
+        ("小说", "writer"), ("诗人", "writer"), ("写书", "writer"), ("写故事", "writer"),
+        ("军人", "soldier"), ("解放", "soldier"), ("站岗", "soldier"),
+        ("保卫", "soldier"), ("当兵", "soldier"), ("部队", "soldier"),
+        ("科学", "scientist"), ("天文", "scientist"), ("实验", "scientist"),
+        ("发明", "scientist"), ("研究", "scientist"), ("星", "scientist"),
+        ("老师", "teacher"), ("教师", "teacher"), ("教书", "teacher"),
+        ("医生", "doctor"), ("护士", "doctor"), ("治病", "doctor"), ("救人", "doctor"),
+        ("画家", "painter"), ("画画", "painter"), ("画画儿", "painter"),
+        ("美术", "painter"), ("艺术", "painter"),
+    ]
+    for kw, sp in rules:
+        if kw in text:
+            return sp
+    return "sprout"
 
 
 def _stage_for(growth_value: int) -> str:
@@ -296,19 +337,26 @@ GROWTH_RECORDS: list[dict[str, Any]] = [
         "needs_care": False,
         "signal": None,
         "growth_value": 28,
-        "species": _species_for(None),
-        "last_gist": "画了山外的梯田，想去看更大的世界",
+        "species": _species_for("画家"),
+        "last_gist": "这周画了山外面的城市，用了好多颜色",
         "commitments": [
             {
                 "id": "c1",
-                "text": "每周画一幅家乡的画",
-                "created_at": "2026-07-26T10:00:00+00:00",
+                "text": "我要把家门口的大山画下来",
+                "created_at": "2026-07-20T10:00:00+00:00",
+                "status": "fulfilled",
+            },
+            {
+                "id": "c2",
+                "text": "我要每天画一幅小画送给同学",
+                "created_at": "2026-07-21T10:00:00+00:00",
                 "status": "active",
             },
         ],
         "actions": [],
         "history": [
-            {"date": "昨天", "topic": "山外面的世界", "state": "daily", "mins": 6},
+            {"date": "昨天", "topic": "山外面的城市", "state": "daily", "mins": 6},
+            {"date": "上周", "topic": "第一次说想当画家", "state": "daily", "mins": 5},
         ],
     },
     {
@@ -558,6 +606,9 @@ CREATE TABLE IF NOT EXISTS classes (
     class_name TEXT NOT NULL,
     school TEXT NOT NULL,
     region_key TEXT NOT NULL,
+    city TEXT NOT NULL DEFAULT '',
+    county TEXT NOT NULL DEFAULT '',
+    town TEXT NOT NULL DEFAULT '',
     grade TEXT NOT NULL,
     class_no TEXT NOT NULL
 );

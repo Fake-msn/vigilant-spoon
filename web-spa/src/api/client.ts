@@ -4,6 +4,11 @@ import { clearSession, getSession } from '@/stores/session'
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
+/** 统一清洗班级码：去首尾空白 + 强制大写，避免用户输入小写与服务端存储的大写班级码不匹配 */
+export function normalizeClassCode(code: string): string {
+  return code.trim().toUpperCase()
+}
+
 export type ApiError = { code: string; message: string }
 
 export class ApiClientError extends Error {
@@ -30,7 +35,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${path}`
   const headers = new Headers(init.headers)
   const { token } = getSession()
-  if (token) headers.set('Authorization', `Bearer ${token}`)
+  // 平台网关会剥除 Authorization header，改用 X-Auth-Token 传递 token
+  console.log('[api-debug] path:', path, 'token:', token)
+  if (token) headers.set('X-Auth-Token', token)
 
   // FormData 需要浏览器自动设置带 boundary 的 Content-Type
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
@@ -42,6 +49,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     const code = body.code || 'UNKNOWN'
+    console.error('[api-debug] error:', res.status, code, body)
     if (res.status === 401) {
       throw handleUnauthorized(code)
     }
@@ -124,7 +132,8 @@ async function adminRequest<T>(path: string, init: RequestInit = {}): Promise<T>
   const url = `${API_BASE}${path}`
   const headers = new Headers(init.headers)
   const token = getAdminToken()
-  if (token) headers.set('Authorization', `Bearer ${token}`)
+  // 平台网关会剥除 Authorization header，改用 X-Auth-Token 传递 token
+  if (token) headers.set('X-Auth-Token', token)
   headers.set('Content-Type', 'application/json')
 
   const res = await fetch(url, { ...init, headers })
@@ -145,6 +154,9 @@ export const realClient = {
     class_name: string
     school: string
     region_key: string
+    city?: string
+    county?: string
+    town?: string
     grade: string
     class_no: string
     students: { name: string; grade: string; avatar_seed: number; ideal?: string }[]
@@ -159,25 +171,39 @@ export const realClient = {
       class_no: string
       students: { id: string; name: string; student_no: string; grade: string; avatar_seed: number; role: string; region_key: string; region_name: string; ideal?: string }[]
     }>(`/classes`, { method: 'POST', body: JSON.stringify(req) }),
-  getClass: (code: string) => request<{
-    class_code: string
-    class_name: string
-    school: string
-    region_key: string
-    region_name: string
-    grade: string
-    class_no: string
-    students: { id: string; name: string; student_no: string; grade: string; avatar_seed: number; role: string; region_key: string; region_name: string; ideal?: string }[]
-  }>(`/classes/${encodeURIComponent(code)}`),
-  enter: (code: string, studentName: string) => request<{ session_token: string; profile: Record<string, unknown> }>(`/session/enter`, { method: 'POST', body: JSON.stringify({ class_code: code, student_name: studentName }) }),
-  teacherEnter: (code: string, teacherName: string, password?: string) => request<{ session_token: string; profile: Record<string, unknown>; expires_at: string }>(`/session/teacher/enter`, { method: 'POST', body: JSON.stringify({ class_code: code, teacher_name: teacherName, password }) }),
+  getClass: (code: string) => {
+    const $code = normalizeClassCode(code)
+    return request<{
+      class_code: string
+      class_name: string
+      school: string
+      region_key: string
+      region_name: string
+      grade: string
+      class_no: string
+      students: { id: string; name: string; student_no: string; grade: string; avatar_seed: number; role: string; region_key: string; region_name: string; ideal?: string }[]
+    }>(`/classes/${encodeURIComponent($code)}`)
+  },
+  enter: (code: string, studentName: string) => {
+    const $code = normalizeClassCode(code)
+    return request<{ session_token: string; profile: Record<string, unknown> }>(`/session/enter`, { method: 'POST', body: JSON.stringify({ class_code: $code, student_name: studentName }) })
+  },
+  teacherEnter: (code: string, teacherName: string, password?: string) => {
+    const $code = normalizeClassCode(code)
+    return request<{ session_token: string; profile: Record<string, unknown>; expires_at: string }>(`/session/teacher/enter`, { method: 'POST', body: JSON.stringify({ class_code: $code, teacher_name: teacherName, password }) })
+  },
+  // 不指定班级码的教师登录：校验姓名+密码，默认分配首个任教班级生成会话（后端保证 profile.class_code 非空，便于后续页面读取）
+  teacherLogin: (teacherName: string, password?: string) => request<{ session_token: string; profile: Record<string, unknown>; expires_at: string }>(`/session/teacher/login`, { method: 'POST', body: JSON.stringify({ teacher_name: teacherName, password }) }),
   getTeacherClasses: () => request<{
     teacher_id: string
     name: string
     school: string
-    classes: { class_code: string; class_name: string; school: string; grade: string; class_no: string }[]
+    classes: { class_code: string; class_name: string; school: string; region_key: string; city: string; county: string; town: string; grade: string; class_no: string }[]
   }>(`/session/teacher/classes`),
-  teacherSwitch: (classCode: string) => request<{ session_token: string; profile: Record<string, unknown>; expires_at: string }>(`/session/teacher/switch`, { method: 'POST', body: JSON.stringify({ class_code: classCode }) }),
+  teacherSwitch: (classCode: string) => {
+    const $code = normalizeClassCode(classCode)
+    return request<{ session_token: string; profile: Record<string, unknown>; expires_at: string }>(`/session/teacher/switch`, { method: 'POST', body: JSON.stringify({ class_code: $code }) })
+  },
 
   // 教师账号管理（注册 / 个人信息 / 密码）
   teacherRegister: (req: {
@@ -206,9 +232,18 @@ export const realClient = {
       method: 'PUT',
       body: JSON.stringify(req),
     }),
-  startClass: (code: string) => request<{ session_id: string; state: 'idle' | 'active' | 'paused'; current_student: string | null; current_slot: string | null; turn_count: number; updated_at: string }>(`/classes/${encodeURIComponent(code)}/session/start`, { method: 'POST' }),
-  controlClass: (code: string, action: string, clientCmdId: string, payload?: Record<string, unknown>) => request<{ session_id: string; state: 'idle' | 'active' | 'paused'; current_student: string | null; current_slot: string | null; turn_count: number; updated_at: string }>(`/classes/${encodeURIComponent(code)}/session/control`, { method: 'POST', body: JSON.stringify({ action, client_cmd_id: clientCmdId, payload }) }),
-  getClassStatus: (code: string) => request<{ session_id: string; state: 'idle' | 'active' | 'paused'; current_student: string | null; current_slot: string | null; turn_count: number; updated_at: string }>(`/classes/${encodeURIComponent(code)}/session/status`),
+  startClass: (code: string) => {
+    const $code = normalizeClassCode(code)
+    return request<{ session_id: string; state: 'idle' | 'active' | 'paused'; current_student: string | null; current_slot: string | null; turn_count: number; updated_at: string }>(`/classes/${encodeURIComponent($code)}/session/start`, { method: 'POST' })
+  },
+  controlClass: (code: string, action: string, clientCmdId: string, payload?: Record<string, unknown>) => {
+    const $code = normalizeClassCode(code)
+    return request<{ session_id: string; state: 'idle' | 'active' | 'paused'; current_student: string | null; current_slot: string | null; turn_count: number; updated_at: string }>(`/classes/${encodeURIComponent($code)}/session/control`, { method: 'POST', body: JSON.stringify({ action, client_cmd_id: clientCmdId, payload }) })
+  },
+  getClassStatus: (code: string) => {
+    const $code = normalizeClassCode(code)
+    return request<{ session_id: string; state: 'idle' | 'active' | 'paused'; current_student: string | null; current_slot: string | null; turn_count: number; updated_at: string }>(`/classes/${encodeURIComponent($code)}/session/status`)
+  },
 
   // F3 成长 / 宠物 / 任务
   getGrowth: (studentId: string) => request<{
@@ -234,7 +269,11 @@ export const realClient = {
     }
     actions: unknown[] | null
     history: unknown[] | null
-  }>(`/students/${encodeURIComponent(studentId)}/growth`),
+  }>(`/students/${encodeURIComponent(studentId)}/growth?view=full`),
+  updateCommitments: (studentId: string, commitments: { id: string; text: string; created_at?: string | null; status: 'active' | 'fulfilled' | 'expired' }[]) => request<{ id: string; text: string; created_at: string; status: 'active' | 'fulfilled' | 'expired' }[]>(`/students/${encodeURIComponent(studentId)}/commitments`, {
+    method: 'PATCH',
+    body: JSON.stringify({ commitments }),
+  }),
   getPet: (studentId: string) => request<{
     species: string
     stage: number
@@ -250,28 +289,39 @@ export const realClient = {
     method: 'POST',
     headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
   }),
+  uploadAvatar: (studentId: string, file: File) => request<{ avatar_url: string }>(`/students/${encodeURIComponent(studentId)}/avatar`, {
+    method: 'POST',
+    body: (() => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return fd
+    })(),
+  }),
   getJob: (jobId: string) => request<{
     job_id: string
     status: 'pending' | 'running' | 'done' | 'failed'
     result_url: string | null
     error: { code: string; message: string } | null
   }>(`/jobs/${encodeURIComponent(jobId)}`),
-  getClassPets: (code: string) => request<{
-    student_id: string
-    name: string
-    avatar_seed: number
-    pet: {
-      species: string
-      stage: number
-      state: 'daily' | 'gray' | 'cheer'
-      growth_value: number
-      last_growth_at: string
-      cheer_until: string | null
-      needs_care: boolean
-      portrait_url: string | null
-      updated_at: string
-    }
-  }[]>(`/classes/${encodeURIComponent(code)}/pets`),
+  getClassPets: (code: string) => {
+    const $code = normalizeClassCode(code)
+    return request<{
+      student_id: string
+      name: string
+      avatar_seed: number
+      pet: {
+        species: string
+        stage: number
+        state: 'daily' | 'gray' | 'cheer'
+        growth_value: number
+        last_growth_at: string
+        cheer_until: string | null
+        needs_care: boolean
+        portrait_url: string | null
+        updated_at: string
+      }
+    }[]>(`/classes/${encodeURIComponent($code)}/pets`)
+  },
 
   // F4 备课 / 课程
   generateLesson: (topic: string, goals: string[], guidance?: string) => request<{
@@ -293,17 +343,20 @@ export const realClient = {
     materials: { title: string; content: string }[]
     created_at: string
   }>(`/lessons/${encodeURIComponent(lessonId)}`),
-  getClassLessons: (code: string) => request<{
-    lesson_id: string
-    topic: string
-    date: string
-    duration: string | null
-    joined: number
-    avg_score: number | null
-    status: 'active' | 'done'
-    goal: string
-    traces: string[]
-  }[]>(`/classes/${encodeURIComponent(code)}/lessons`),
+  getClassLessons: (code: string) => {
+    const $code = normalizeClassCode(code)
+    return request<{
+      lesson_id: string
+      topic: string
+      date: string
+      duration: string | null
+      joined: number
+      avg_score: number | null
+      status: 'active' | 'done'
+      goal: string
+      traces: string[]
+    }[]>(`/classes/${encodeURIComponent($code)}/lessons`)
+  },
   addLessonTrace: (lessonId: string, content: string) => request<{
     lesson_id: string
     topic: string
@@ -320,49 +373,55 @@ export const realClient = {
   }),
 
   // F4 学情
-  getAcademicSummary: (code: string) => request<{
-    records: {
-      student_id: string
-      student_no: string
-      name: string
-      role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
-      scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
-      background: string
-      teacher_note: string
-      updated_at: string
-    }[]
-    summary: {
-      count: number
-      avg_score: number
-      attention_count: number
-    }
-  }>(`/classes/${encodeURIComponent(code)}/academic`),
+  getAcademicSummary: (code: string) => {
+    const $code = normalizeClassCode(code)
+    return request<{
+      records: {
+        student_id: string
+        student_no: string
+        name: string
+        role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
+        scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
+        background: string
+        teacher_note: string
+        updated_at: string
+      }[]
+      summary: {
+        count: number
+        avg_score: number
+        attention_count: number
+      }
+    }>(`/classes/${encodeURIComponent($code)}/academic`)
+  },
   importAcademicJson: (code: string, records: {
     student_no: string
     scores: { subject: string; score: number; trend?: 'up' | 'down' | 'flat' }[]
     role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
     background?: string
     teacher_note?: string
-  }[]) => request<{
-    records: {
-      student_id: string
-      student_no: string
-      name: string
-      role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
-      scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
-      background: string
-      teacher_note: string
-      updated_at: string
-    }[]
-    summary: {
-      count: number
-      avg_score: number
-      attention_count: number
-    }
-  }>(`/classes/${encodeURIComponent(code)}/academic`, {
-    method: 'POST',
-    body: JSON.stringify({ records }),
-  }),
+  }[]) => {
+    const $code = normalizeClassCode(code)
+    return request<{
+      records: {
+        student_id: string
+        student_no: string
+        name: string
+        role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
+        scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
+        background: string
+        teacher_note: string
+        updated_at: string
+      }[]
+      summary: {
+        count: number
+        avg_score: number
+        attention_count: number
+      }
+    }>(`/classes/${encodeURIComponent($code)}/academic`, {
+      method: 'POST',
+      body: JSON.stringify({ records }),
+    })
+  },
   manualAddAcademic: (code: string, entry: {
     name: string
     student_no?: string
@@ -370,138 +429,165 @@ export const realClient = {
     role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
     background?: string
     teacher_note?: string
-  }) => request<{
-    records: {
-      student_id: string
-      student_no: string
-      name: string
-      role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
-      scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
-      background: string
-      teacher_note: string
-      updated_at: string
-    }[]
-    summary: {
-      count: number
-      avg_score: number
-      attention_count: number
-    }
-  }>(`/classes/${encodeURIComponent(code)}/academic/manual`, {
-    method: 'POST',
-    body: JSON.stringify(entry),
-  }),
-  importAcademicFile: (code: string, file: File) => request<{
-    records: {
-      student_id: string
-      student_no: string
-      name: string
-      role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
-      scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
-      background: string
-      teacher_note: string
-      updated_at: string
-    }[]
-    summary: {
-      count: number
-      avg_score: number
-      attention_count: number
-    }
-  }>(`/classes/${encodeURIComponent(code)}/academic`, {
-    method: 'POST',
-    body: (() => {
-      const fd = new FormData()
-      fd.append('file', file)
-      return fd
-    })(),
-  }),
+  }) => {
+    const $code = normalizeClassCode(code)
+    return request<{
+      records: {
+        student_id: string
+        student_no: string
+        name: string
+        role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
+        scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
+        background: string
+        teacher_note: string
+        updated_at: string
+      }[]
+      summary: {
+        count: number
+        avg_score: number
+        attention_count: number
+      }
+    }>(`/classes/${encodeURIComponent($code)}/academic/manual`, {
+      method: 'POST',
+      body: JSON.stringify(entry),
+    })
+  },
+  importAcademicFile: (code: string, file: File) => {
+    const $code = normalizeClassCode(code)
+    return request<{
+      records: {
+        student_id: string
+        student_no: string
+        name: string
+        role: 'member' | 'group_leader' | 'class_committee' | 'subject_rep'
+        scores: { subject: string; score: number; trend: 'up' | 'down' | 'flat' }[]
+        background: string
+        teacher_note: string
+        updated_at: string
+      }[]
+      summary: {
+        count: number
+        avg_score: number
+        attention_count: number
+      }
+    }>(`/classes/${encodeURIComponent($code)}/academic`, {
+      method: 'POST',
+      body: (() => {
+        const fd = new FormData()
+        fd.append('file', file)
+        return fd
+      })(),
+    })
+  },
 
   // 班宠积分制度
-  getPointRules: (code: string) => request<{
-    rule_id: string
-    name: string
-    points: number
-    category: string | null
-    enabled: boolean
-  }[]>(`/classes/${encodeURIComponent(code)}/points/rules`),
+  getPointRules: (code: string) => {
+    const $code = normalizeClassCode(code)
+    return request<{
+      rule_id: string
+      name: string
+      points: number
+      category: string | null
+      enabled: boolean
+    }[]>(`/classes/${encodeURIComponent($code)}/points/rules`)
+  },
   updatePointRules: (code: string, rules: {
     rule_id?: string | null
     name: string
     points: number
     category?: string | null
     enabled?: boolean
-  }[]) => request<{
-    rule_id: string
-    name: string
-    points: number
-    category: string | null
-    enabled: boolean
-  }[]>(`/classes/${encodeURIComponent(code)}/points/rules`, {
-    method: 'PUT',
-    body: JSON.stringify({ rules }),
-  }),
+  }[]) => {
+    const $code = normalizeClassCode(code)
+    return request<{
+      rule_id: string
+      name: string
+      points: number
+      category: string | null
+      enabled: boolean
+    }[]>(`/classes/${encodeURIComponent($code)}/points/rules`, {
+      method: 'PUT',
+      body: JSON.stringify({ rules }),
+    })
+  },
   awardPoints: (code: string, req: {
     student_id: string
     rule_id?: string | null
     points?: number | null
     name?: string | null
     note?: string | null
-  }) => request<{
-    student_id: string
-    points: number
-    points_total: number
-    level: number
-    leveled_up: boolean
-    hunger: number
-    mood: number
-    state: string
-    ledger_id: number
-  }>(`/classes/${encodeURIComponent(code)}/points/award`, {
-    method: 'POST',
-    body: JSON.stringify(req),
-  }),
-  getPointOverview: (code: string) => request<{
-    rules: {
-      rule_id: string
-      name: string
+  }) => {
+    const $code = normalizeClassCode(code)
+    return request<{
+      student_id: string
       points: number
-      category: string | null
-      enabled: boolean
-    }[]
-    students: { id: string; name: string; group_id: string | null }[]
-    groups: {
+      points_total: number
+      level: number
+      leveled_up: boolean
+      hunger: number
+      mood: number
+      state: string
+      ledger_id: number
+    }>(`/classes/${encodeURIComponent($code)}/points/award`, {
+      method: 'POST',
+      body: JSON.stringify(req),
+    })
+  },
+  getPointOverview: (code: string) => {
+    const $code = normalizeClassCode(code)
+    return request<{
+      rules: {
+        rule_id: string
+        name: string
+        points: number
+        category: string | null
+        enabled: boolean
+      }[]
+      students: { id: string; name: string; group_id: string | null }[]
+      groups: {
+        group_id: string
+        group_name: string
+        color: string | null
+        members: string[]
+      }[]
+    }>(`/classes/${encodeURIComponent($code)}/points/overview`)
+  },
+  getGroups: (code: string) => {
+    const $code = normalizeClassCode(code)
+    return request<{
       group_id: string
       group_name: string
       color: string | null
       members: string[]
-    }[]
-  }>(`/classes/${encodeURIComponent(code)}/points/overview`),
-  getGroups: (code: string) => request<{
-    group_id: string
-    group_name: string
-    color: string | null
-    members: string[]
-  }[]>(`/classes/${encodeURIComponent(code)}/groups`),
+    }[]>(`/classes/${encodeURIComponent($code)}/groups`)
+  },
   configGroups: (code: string, groups: {
     group_name: string
     color?: string | null
-  }[], assignments: Record<string, string>) => request<{
-    group_id: string
-    group_name: string
-    color: string | null
-    members: string[]
-  }[]>(`/classes/${encodeURIComponent(code)}/groups`, {
-    method: 'PUT',
-    body: JSON.stringify({ groups, assignments }),
-  }),
-  getLeaderboard: (code: string) => request<{
-    items: {
+  }[], assignments: Record<string, string>) => {
+    const $code = normalizeClassCode(code)
+    return request<{
       group_id: string
       group_name: string
       color: string | null
-      total_points: number
-      member_count: number
-    }[]
-  }>(`/classes/${encodeURIComponent(code)}/leaderboard`),
+      members: string[]
+    }[]>(`/classes/${encodeURIComponent($code)}/groups`, {
+      method: 'PUT',
+      body: JSON.stringify({ groups, assignments }),
+    })
+  },
+  getLeaderboard: (code: string) => {
+    const $code = normalizeClassCode(code)
+    return request<{
+      items: {
+        group_id: string
+        group_name: string
+        color: string | null
+        total_points: number
+        member_count: number
+      }[]
+    }>(`/classes/${encodeURIComponent($code)}/leaderboard`)
+  },
   getStudentPoints: (studentId: string) => request<{
     id: number
     name: string
@@ -509,6 +595,19 @@ export const realClient = {
     note: string | null
     created_at: string
   }[]>(`/students/${encodeURIComponent(studentId)}/points`),
+  getLetters: (studentId: string) => request<{
+    letter_id: string
+    student_id: string
+    title: string
+    body: string
+    generated_at: string
+    source: 'template' | 'llm'
+    is_read: boolean
+  }[]>(`/students/${encodeURIComponent(studentId)}/letters`),
+  generateLetter: (studentId: string) => request<{ job_id: string }>(
+    `/students/${encodeURIComponent(studentId)}/letters/generate`,
+    { method: 'POST' },
+  ),
 
   // 方案 5.3 管理员后台
   adminLogin: async (password: string) => {

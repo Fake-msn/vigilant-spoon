@@ -1,5 +1,6 @@
 """小信 FastAPI 入口。"""
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -26,8 +27,21 @@ from app.routers import (
     letters,
     points,
     session,
-    voice_ws,
 )
+
+# voice_ws 依赖 agentscope，当 mcp/agentscope 版本不兼容时会阻断整个服务启动；
+# 为保持防御性降级（核心业务 / 登录 / 课堂 路由不受影响），这里做 try/except 导入。
+try:
+    from app.routers import voice_ws as _voice_ws_router
+
+    _VOICE_WS_AVAILABLE = True
+except Exception as _voice_import_error:  # pragma: no cover - 环境依赖兜底
+    logging.getLogger("main").warning(
+        "voice_ws 路由未加载（语音会话功能暂不可用）：%s",
+        _voice_import_error,
+    )
+    _voice_ws_router = None  # type: ignore[assignment]
+    _VOICE_WS_AVAILABLE = False
 from app.schemas import ErrorEnvelope, HealthCheck
 from app.schemas import __all__ as schemas_all
 from app.services.imagegen import static_dir
@@ -139,7 +153,8 @@ app.include_router(lesson.router, prefix="/api")
 app.include_router(academic.router, prefix="/api")
 app.include_router(classroom.router, prefix="/api")
 app.include_router(points.router, prefix="/api")
-app.include_router(voice_ws.router, prefix="/api")
+if _VOICE_WS_AVAILABLE:
+    app.include_router(_voice_ws_router.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 
 # 静态资源（班宠画像等）

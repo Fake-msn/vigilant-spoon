@@ -56,7 +56,20 @@ def migrate_up(conn: sqlite3.Connection, target: str | None = None) -> list[str]
             continue
         logger.info("Applying migration %s", version)
         sql = read_sql(up_file)
-        conn.executescript(sql)
+        # 逐条执行：允许 ALTER TABLE ADD COLUMN 在列已存在时静默跳过，
+        # 保证迁移在不同初始 schema 下（如 seed.py 的 CREATE_SQL 已含某些列）幂等。
+        for stmt in _split_statements(sql):
+            stmt = stmt.strip()
+            if not stmt:
+                continue
+            try:
+                conn.execute(stmt)
+            except sqlite3.OperationalError as e:
+                msg = str(e).lower()
+                if "duplicate column name" in msg:
+                    logger.warning("  column already exists, skipping: %s", stmt[:80])
+                    continue
+                raise
         conn.execute(
             "INSERT INTO schema_migrations (version) VALUES (?)",
             (version,),
@@ -64,6 +77,25 @@ def migrate_up(conn: sqlite3.Connection, target: str | None = None) -> list[str]
         conn.commit()
         applied_versions.append(version)
     return applied_versions
+
+
+def _split_statements(sql: str) -> list[str]:
+    """按分号拆分 SQL 语句，过滤注释和空语句。"""
+    stmts: list[str] = []
+    # 去除 SQL 注释（-- 开头的行内注释）
+    cleaned_lines: list[str] = []
+    for line in sql.splitlines():
+        # 去掉行内注释（简单处理：-- 后的内容，但不处理字符串内的 --）
+        comment_pos = line.find("--")
+        if comment_pos >= 0:
+            line = line[:comment_pos]
+        cleaned_lines.append(line)
+    cleaned = "\n".join(cleaned_lines)
+    for part in cleaned.split(";"):
+        part = part.strip()
+        if part:
+            stmts.append(part)
+    return stmts
 
 
 def migrate_down(conn: sqlite3.Connection, target: str | None = None) -> list[str]:

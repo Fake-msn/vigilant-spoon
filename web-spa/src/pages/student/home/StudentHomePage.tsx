@@ -1,6 +1,7 @@
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Icon } from '@/components/Icon'
 import { KidAvatar } from '@/components/art/KidAvatar'
+import { StudentLogoutButton } from '@/components/StudentLogoutButton'
 import { clearSession, getSession, isStudentProfile } from '@/stores/session'
 
 export function StudentHomePage() {
@@ -9,8 +10,12 @@ export function StudentHomePage() {
   if (!profile || !isStudentProfile(profile)) return <Navigate to="/" replace />
 
   const switchClassmate = () => {
+    // 提前拿到当前学生所属班级码，清 session 后通过路由 state 带入 IdentityPage
+    // 直接进入同班同学自由选择步骤，避免用户再输一次班级码
+    const { profile } = getSession()
+    const presetClass = profile && isStudentProfile(profile) ? profile.class_code.trim() : undefined
     clearSession()
-    navigate('/identity', { replace: true })
+    navigate('/identity', { replace: true, state: presetClass ? { presetClass } : undefined })
   }
 
   const entries = [
@@ -37,6 +42,10 @@ export function StudentHomePage() {
       <img src="/design/cloud.png" alt="" aria-hidden className="absolute -left-14 bottom-6 w-80 opacity-45" />
 
       <div className="relative z-10 mx-auto w-full max-w-5xl px-6 py-14 md:py-20 lg:px-10">
+        {/* 左上角：退出登录入口（便于深入体验时自如切换） */}
+        <div className="absolute left-4 top-4 z-20 md:left-6 md:top-6 lg:left-10">
+          <StudentLogoutButton />
+        </div>
         {/* 学生问候 */}
         <div className="flex items-center gap-5">
           <span className="shrink-0 overflow-hidden rounded-xl border-4 border-white shadow-card" style={{ width: 84, height: 84 }}>

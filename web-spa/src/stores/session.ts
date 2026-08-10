@@ -7,6 +7,7 @@ export type Profile = {
   student_no: string
   avatar_seed: number
   ideal?: string
+  custom_avatar_url?: string
   class_code: string
   region_key: RegionKey
   region_name: string
@@ -29,6 +30,21 @@ export type Session = {
 
 const TOKEN_KEY = 'xx_session_token'
 const PROFILE_KEY = 'xx_session_profile'
+export const SESSION_CHANGE_EVENT = 'xx-session-change'
+
+function emitSessionChange(): void {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return
+  try {
+    window.dispatchEvent(new CustomEvent(SESSION_CHANGE_EVENT))
+  } catch {
+    // CustomEvent 在某些旧环境不可用，降级为 Event
+    try {
+      window.dispatchEvent(new Event(SESSION_CHANGE_EVENT))
+    } catch {
+      /* noop */
+    }
+  }
+}
 
 // 契约 v2.1：st_ 前缀 + opaque token（非 JWT），固定 48 字符随机段
 const TOKEN_RE = /^st_[A-Za-z0-9_-]{48}$/
@@ -105,6 +121,7 @@ const STUDENT_FIELDS: (keyof Profile)[] = [
   'region_key',
   'region_name',
 ]
+
 const TEACHER_FIELDS: (keyof TeacherProfile)[] = [
   'id',
   'name',
@@ -159,11 +176,13 @@ export function setSession(session: Session): void {
   }
   setRawToken(session.token)
   setRawProfile(JSON.stringify(session.profile))
+  emitSessionChange()
 }
 
 export function clearSession(): void {
   setRawToken(null)
   setRawProfile(null)
+  emitSessionChange()
 }
 
 export function isAuthenticated(): boolean {

@@ -1,4 +1,4 @@
-import { chatScript, type ChatMsg } from '@/mocks/data'
+import { getChatScript, type ChatMsg } from '@/mocks/data'
 
 export type VoiceEvent =
   | { type: 'session_started' }
@@ -16,8 +16,11 @@ export class MockVoiceClient {
   private index = 0
   private timers: ReturnType<typeof setTimeout>[] = []
   private connected = false
+  private script: ChatMsg[]
 
-  constructor(private onEvent: (event: VoiceEvent) => void) {}
+  constructor(private onEvent: (event: VoiceEvent) => void, ideal?: string | null) {
+    this.script = getChatScript(ideal)
+  }
 
   connect() {
     this.connected = true
@@ -31,13 +34,13 @@ export class MockVoiceClient {
   }
 
   startTurn() {
-    if (!this.connected || this.index >= chatScript.length) return
+    if (!this.connected || this.index >= this.script.length) return
     this.clearTimers()
 
     const batch: ChatMsg[] = []
-    if (chatScript[this.index]?.from === 'me') batch.push(chatScript[this.index])
+    if (this.script[this.index]?.from === 'me') batch.push(this.script[this.index])
     const aiIndex = this.index + batch.length
-    if (chatScript[aiIndex]?.from === 'ai') batch.push(chatScript[aiIndex])
+    if (this.script[aiIndex]?.from === 'ai') batch.push(this.script[aiIndex])
 
     // listening
     this.emit({ type: 'vad_start' })

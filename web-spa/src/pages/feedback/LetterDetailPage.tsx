@@ -1,20 +1,76 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { letters } from '@/mocks/data'
+import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
+import { StudentLogoutButton } from '@/components/StudentLogoutButton'
 import { PixelArt } from '@/components/art/PixelArt'
 import { petMap, petPalette } from '@/components/art/pixelData'
+import { getSession, isStudentProfile } from '@/stores/session'
+
+type ApiLetter = {
+  letter_id: string
+  student_id: string
+  title: string
+  body: string
+  generated_at: string
+  source: 'template' | 'llm'
+  is_read: boolean
+}
 
 export function LetterDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [letters, setLetters] = useState<ApiLetter[]>([])
+  const [loading, setLoading] = useState(true)
   const [jobRef, setJobRef] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
 
-  const idx = useMemo(() => letters.findIndex((l) => l.id === id), [id])
+  useEffect(() => {
+    const { profile } = getSession()
+    const studentId = profile && isStudentProfile(profile) ? profile.id : null
+    if (!studentId) {
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    api
+      .getLetters(studentId)
+      .then((data) => {
+        setLetters(data)
+      })
+      .catch(() => {
+        // 加载失败时保持空列表
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const idx = letters.findIndex((l) => l.letter_id === id)
   const letter = idx >= 0 ? letters[idx] : null
   const prev = letters[idx + 1]
   const next = letters[idx - 1]
+
+  const generate = async () => {
+    const { profile } = getSession()
+    const studentId = profile && isStudentProfile(profile) ? profile.id : null
+    if (!studentId) return
+    setGenerating(true)
+    try {
+      const resp = await api.generateLetter(studentId)
+      setJobRef(resp.job_id)
+    } catch {
+      // 忽略错误
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto w-full max-w-4xl px-6 py-10 text-center text-ink-soft">
+        信件加载中…
+      </div>
+    )
+  }
 
   if (!letter) {
     return (
@@ -27,20 +83,19 @@ export function LetterDetailPage() {
     )
   }
 
-  const generate = async () => {
-    setGenerating(true)
-    // mock: R8 触发 → 返回 JobRef
-    await new Promise((resolve) => setTimeout(resolve, 600))
-    setJobRef(`job_${Date.now()}`)
-    setGenerating(false)
-  }
+  // 将 body 字符串按换行拆分成段落
+  const paragraphs = letter.body.split('\n').filter((line) => line.trim())
 
   return (
     <div className="mx-auto w-full max-w-4xl px-6 py-10">
-      <Link to="/student/letters" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft transition-colors hover:text-brand">
-        <Icon name="arrow-left" size={16} />
-        返回信箱
-      </Link>
+      {/* 顶部操作栏：返回信箱 + 左上角退出登录 */}
+      <div className="flex items-center justify-between">
+        <Link to="/student/letters" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft transition-colors hover:text-brand">
+          <Icon name="arrow-left" size={16} />
+          返回信箱
+        </Link>
+        <StudentLogoutButton />
+      </div>
 
       {/* 信纸 */}
       <article className="relative mt-6 overflow-hidden rounded-xl border border-warm/25 bg-[#fffdf7] shadow-card animate-rise">
@@ -60,10 +115,10 @@ export function LetterDetailPage() {
             <div>
               <span className="tag bg-warm-soft text-warm-deep">
                 <Icon name="letter" size={13} />
-                {letter.week}
+                {letter.title}
               </span>
               <p className="mt-3 text-xs font-medium tracking-wide text-ink-faint">
-                {letter.date} · 由「小信」寄出
+                {new Date(letter.generated_at).toLocaleDateString('zh-CN')} · 由「小信」寄出
               </p>
             </div>
             <div className="flex flex-col items-center gap-1">
@@ -76,7 +131,7 @@ export function LetterDetailPage() {
 
           {/* 正文 */}
           <div className="mt-8 space-y-5">
-            {letter.body.map((p, i) => (
+            {paragraphs.map((p, i) => (
               <p
                 key={i}
                 className={
@@ -94,7 +149,7 @@ export function LetterDetailPage() {
           <div className="mt-10 flex flex-col items-end gap-1 text-right">
             <p className="text-[15px] font-semibold text-ink">一直陪着你的</p>
             <p className="font-cal text-4xl tracking-wide text-brand-deep">小信</p>
-            <p className="text-xs text-ink-faint">{letter.date}</p>
+            <p className="text-xs text-ink-faint">{new Date(letter.generated_at).toLocaleDateString('zh-CN')}</p>
           </div>
         </div>
 
@@ -104,8 +159,8 @@ export function LetterDetailPage() {
         </div>
       </article>
 
-      {/* R8 触发 */}
-      <div className="mt-6 flex items-center justify-center gap-3">
+      {/* 底部 CTA：让小信写一封信 / 去和小信聊聊 — 两按钮同一水平线（视觉规范对齐） */}
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <button
           onClick={generate}
           disabled={generating || !!jobRef}
@@ -114,26 +169,26 @@ export function LetterDetailPage() {
           <Icon name="sparkles" size={16} />
           {generating ? '正在生成…' : jobRef ? '已触发' : '让小信写一封新信'}
         </button>
-        {jobRef && <span className="text-xs text-ink-faint">Job: {jobRef}</span>}
+        <button onClick={() => navigate('/student/voice')} className="btn-brand !px-6 !py-2.5 text-sm">
+          <Icon name="mic" size={16} />
+          去和小信聊聊
+        </button>
+        {jobRef && <span className="w-full text-center text-xs text-ink-faint">Job: {jobRef}</span>}
       </div>
 
       {/* 上一封 / 下一封 */}
       <div className="mt-8 flex items-center justify-between gap-3">
         {prev ? (
-          <Link to={`/student/letters/${prev.id}`} className="btn-line !px-5 !py-2.5 text-sm">
+          <Link to={`/student/letters/${prev.letter_id}`} className="btn-line !px-5 !py-2.5 text-sm">
             <Icon name="arrow-left" size={16} />
-            {prev.week}
+            {prev.title}
           </Link>
         ) : (
           <span />
         )}
-        <button onClick={() => navigate('/student/voice')} className="btn-brand !px-6 !py-2.5 text-sm">
-          <Icon name="mic" size={16} />
-          去和小信聊聊
-        </button>
         {next ? (
-          <Link to={`/student/letters/${next.id}`} className="btn-line !px-5 !py-2.5 text-sm">
-            {next.week}
+          <Link to={`/student/letters/${next.letter_id}`} className="btn-line !px-5 !py-2.5 text-sm">
+            {next.title}
             <Icon name="arrow-right" size={16} />
           </Link>
         ) : (

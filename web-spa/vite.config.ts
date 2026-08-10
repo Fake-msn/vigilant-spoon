@@ -17,11 +17,11 @@ export default defineConfig({
       // 客户端始终用相对前缀 /api，由 Vite 代理转发到后端端口，
       // 避免 VITE_API_BASE 需同时充当“客户端前缀”和“后端 origin”造成冲突。
       '/api': {
-        target: process.env.VITE_PROXY_TARGET || 'http://localhost:8000',
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:8010',
         changeOrigin: true,
       },
       '/api/ws': {
-        target: process.env.VITE_PROXY_TARGET_WS || process.env.VITE_PROXY_TARGET || 'ws://localhost:8000',
+        target: process.env.VITE_PROXY_TARGET_WS || process.env.VITE_PROXY_TARGET || 'ws://localhost:8010',
         ws: true,
         changeOrigin: true,
       },

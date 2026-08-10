@@ -2,19 +2,21 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { growthRows, type PetState } from '@/mocks/data'
 import { Icon } from '@/components/Icon'
+import { StudentLogoutButton } from '@/components/StudentLogoutButton'
 import { PixelArt } from '@/components/art/PixelArt'
-import {
-  petMap,
-  petPalette,
-  petPaletteGray,
-  petPaletteCheer,
-  cakeMap,
-  cakePalette,
-} from '@/components/art/pixelData'
+import { cakeMap, cakePalette } from '@/components/art/pixelData'
+import { PetSprite } from '@/components/art/PetSprite'
+import { speciesFromIdeal } from '@/components/art'
 import { KidAvatar } from '@/components/art/KidAvatar'
 import { TeacherAvatar } from '@/components/art/TeacherAvatar'
 import { VoiceClient, type VoiceEvent, type VoicePhase } from '@/ws/voice'
-import { getSession, isStudentProfile } from '@/stores/session'
+import { clearSession, getSession, isStudentProfile } from '@/stores/session'
+
+/** 理想为空时的展示文案 */
+const IDEAL_PLACEHOLDER = '还在悄悄发芽…'
+function displayIdeal(ideal: string | null | undefined): string {
+  return ideal && String(ideal).trim() ? String(ideal) : IDEAL_PLACEHOLDER
+}
 
 type Msg =
   | { from: 'ai'; text: string; image?: 'cake' | 'dream' }
@@ -42,12 +44,6 @@ function Wave({ active }: { active: boolean }) {
   )
 }
 
-function petPaletteFor(state: PetState) {
-  if (state === 'gray') return petPaletteGray
-  if (state === 'cheer') return petPaletteCheer
-  return petPalette
-}
-
 export function VoicePage() {
   const navigate = useNavigate()
   const { profile } = getSession()
@@ -57,14 +53,41 @@ export function VoicePage() {
   const [dream, setDream] = useState<'none' | 'cake' | 'dream'>('none')
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const clientRef = useRef<VoiceClient | null>(null)
+  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const aiDraftIndexRef = useRef<number | null>(null)
+
+  const clearStopTimer = () => {
+    if (stopTimerRef.current) {
+      clearTimeout(stopTimerRef.current)
+      stopTimerRef.current = null
+    }
+  }
 
   const handleEvent = (event: VoiceEvent) => {
+    console.log('[voice] event:', event.type, event)
     switch (event.type) {
-      case 'transcript':
-        setMsgs((prev) => [...prev, { from: event.from, text: event.text }])
+      case 'transcript': {
+        if (event.from === 'me') {
+          // 用户语音转录，作为一条独立消息
+          setMsgs((prev) => [...prev, { from: 'me', text: event.text }])
+          break
+        }
+        // AI 回复是 delta 片段流，累积到同一条消息中，避免刷屏
+        setMsgs((prev) => {
+          const idx = aiDraftIndexRef.current
+          if (idx !== null && idx >= 0 && idx < prev.length && prev[idx].from === 'ai') {
+            const next = [...prev]
+            next[idx] = { ...next[idx], text: next[idx].text + event.text }
+            return next
+          }
+          aiDraftIndexRef.current = prev.length
+          return [...prev, { from: 'ai', text: event.text }]
+        })
         break
+      }
       case 'image':
         setDream(event.kind)
         break
@@ -78,9 +101,15 @@ export function VoicePage() {
         setPhase('speaking')
         break
       case 'turn_end':
+        clearStopTimer()
+        aiDraftIndexRef.current = null
         setPhase('idle')
         break
+      case 'session_started':
+        setSessionReady(true)
+        break
       case 'session_end':
+        setSessionReady(false)
         break
     }
   }
@@ -107,11 +136,27 @@ export function VoicePage() {
 
   const talk = async () => {
     if (phase !== 'idle') return
-    await clientRef.current?.startTurn()
+    // 本地立即进入聆听态，避免等服务端 vad_start 迟迟无反馈
+    setPhase('listening')
+    try {
+      await clientRef.current?.startTurn()
+    } catch (err) {
+      // 麦克风权限被拒、服务未就绪或启动失败，回退到 idle
+      console.error('[voice] startTurn failed:', err)
+      setPhase('idle')
+    }
   }
 
   const stopTalk = () => {
+    // 本地立即退出聆听态，交还 AI 等待，避免卡在"正在输入"
+    setPhase('thinking')
     clientRef.current?.stopTurn()
+    // 兜底：若服务端迟迟不回 turn_end，强制回到 idle，避免 UI 卡死
+    clearStopTimer()
+    stopTimerRef.current = setTimeout(() => {
+      setPhase('idle')
+      stopTimerRef.current = null
+    }, 8000)
   }
 
   const reset = () => {
@@ -128,6 +173,8 @@ export function VoicePage() {
     })
     client.connect()
     clientRef.current = client
+    aiDraftIndexRef.current = null
+    setSessionReady(false)
     setMsgs([])
     setPhase('idle')
     setDream('none')
@@ -146,16 +193,21 @@ export function VoicePage() {
 
   if (!profile || !isStudentProfile(profile)) return <Navigate to="/" replace />
   const petState: PetState = growthRows.find((g) => g.id === profile.id)?.state ?? 'daily'
+  const petSpecies = speciesFromIdeal(profile.ideal)
 
   return (
     <div className="mx-auto w-full max-w-[1760px] px-6 pb-10 pt-6 lg:px-10">
-      <Link
-        to="/student"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft transition-colors hover:text-brand"
-      >
-        <Icon name="arrow-left" size={16} />
-        返回主页
-      </Link>
+      {/* 顶部操作栏：返回主页 + 左上角退出登录 */}
+      <div className="flex items-center justify-between">
+        <Link
+          to="/student"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft transition-colors hover:text-brand"
+        >
+          <Icon name="arrow-left" size={16} />
+          返回主页
+        </Link>
+        <StudentLogoutButton />
+      </div>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[2.4fr_1fr]">
         {/* 左：对话区 */}
@@ -195,7 +247,7 @@ export function VoicePage() {
                         {m.image === 'cake' ? (
                           <PixelArt map={cakeMap} palette={cakePalette} size={110} title="像素蛋糕" />
                         ) : (
-                          <img src="/design/pet-baker.png" alt="蛋糕师电子宠物" width={150} className="drop-shadow-sm" />
+                          <PetSprite species={petSpecies} state={petState} size={150} title="你的专属电子宠物" />
                         )}
                         <span className="mt-2 text-xs font-semibold text-grape">
                           {m.image === 'cake' ? '梦想小蛋糕' : '你的专属电子宠物'}
@@ -246,7 +298,7 @@ export function VoicePage() {
                 <>
                   <button
                     onClick={phase === 'listening' ? stopTalk : talk}
-                    disabled={phase === 'thinking' || phase === 'speaking'}
+                    disabled={phase === 'thinking' || phase === 'speaking' || !sessionReady}
                     aria-label={phase === 'listening' ? '点击结束说话' : '点击开始说话'}
                     className={`flex h-18 w-18 items-center justify-center rounded-full text-white transition-all ${
                       phase === 'listening'
@@ -258,13 +310,15 @@ export function VoicePage() {
                     <Icon name={phase === 'listening' ? 'square' : 'mic'} size={30} />
                   </button>
                   <p className="text-sm font-medium text-ink-soft">
-                    {phase === 'listening'
-                      ? '我在听，说完点按钮…'
-                      : phase === 'thinking'
-                        ? '小信正在想…'
-                        : phase === 'speaking'
-                          ? '小信在说…'
-                          : '点击麦克风，告诉小信你的梦想吧'}
+                    {!sessionReady
+                      ? '小信准备中…'
+                      : phase === 'listening'
+                        ? '我在听，说完点按钮…'
+                        : phase === 'thinking'
+                          ? '小信正在想…'
+                          : phase === 'speaking'
+                            ? '小信在说…'
+                            : '点击麦克风，告诉小信你的梦想吧'}
                   </p>
                 </>
               ) : (
@@ -314,7 +368,7 @@ export function VoicePage() {
             {dream === 'none' && (
               <>
                 <span className="animate-floaty">
-                  <PixelArt map={petMap} palette={petPaletteFor(petState)} size={110} title="小信伙伴" />
+                  <PetSprite species="sprout" state={petState} size={110} title="小信伙伴" />
                 </span>
                 <p className="text-[13px] leading-6 text-ink-soft">
                   还没有电子宠物
@@ -333,9 +387,9 @@ export function VoicePage() {
             )}
             {dream === 'dream' && (
               <>
-                <img src="/design/pet-baker.png" alt="蛋糕师电子宠物" width={150} className="animate-pop drop-shadow-md" />
+                <PetSprite species={petSpecies} state={petState} size={150} className="animate-pop drop-shadow-md" title={`${displayIdeal(profile.ideal)}电子宠物`} />
                 <p className="tag bg-grape-soft text-grape">
-                  {profile.ideal ?? '蛋糕师'} · {profile.name}
+                  {displayIdeal(profile.ideal)} · {profile.name}
                 </p>
               </>
             )}
@@ -365,7 +419,15 @@ export function VoicePage() {
           </div>
 
           <button
-            onClick={() => navigate('/identity')}
+            onClick={() => {
+              // 提前拿到当前学生所属班级码，清 session 后通过路由 state 带入 IdentityPage
+              // 直接进入同班同学自由选择步骤，避免用户再输一次班级码
+              // 同时修复之前不清 session 被 IdentityPage 顶部 Navigate 直接弹回 /student 的隐 bug
+              const { profile } = getSession()
+              const presetClass = profile && isStudentProfile(profile) ? profile.class_code.trim() : undefined
+              clearSession()
+              navigate('/identity', { replace: true, state: presetClass ? { presetClass } : undefined })
+            }}
             className="text-center text-xs font-medium text-ink-faint transition-colors hover:text-brand"
           >
             换个同学重新进入 →
