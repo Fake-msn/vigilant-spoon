@@ -3,18 +3,19 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { growthRows, type PetState } from '@/mocks/data'
 import { Icon } from '@/components/Icon'
 import { PixelArt } from '@/components/art/PixelArt'
-import {
-  petMap,
-  petPalette,
-  petPaletteGray,
-  petPaletteCheer,
-  cakeMap,
-  cakePalette,
-} from '@/components/art/pixelData'
+import { cakeMap, cakePalette } from '@/components/art/pixelData'
+import { PetSprite } from '@/components/art/PetSprite'
+import { speciesFromIdeal } from '@/components/art'
 import { KidAvatar } from '@/components/art/KidAvatar'
 import { TeacherAvatar } from '@/components/art/TeacherAvatar'
 import { VoiceClient, type VoiceEvent, type VoicePhase } from '@/ws/voice'
 import { clearSession, getSession, isStudentProfile } from '@/stores/session'
+
+/** 理想为空时的展示文案 */
+const IDEAL_PLACEHOLDER = '还在悄悄发芽…'
+function displayIdeal(ideal: string | null | undefined): string {
+  return ideal && String(ideal).trim() ? String(ideal) : IDEAL_PLACEHOLDER
+}
 
 type Msg =
   | { from: 'ai'; text: string; image?: 'cake' | 'dream' }
@@ -40,12 +41,6 @@ function Wave({ active }: { active: boolean }) {
       ))}
     </div>
   )
-}
-
-function petPaletteFor(state: PetState) {
-  if (state === 'gray') return petPaletteGray
-  if (state === 'cheer') return petPaletteCheer
-  return petPalette
 }
 
 export function VoicePage() {
@@ -197,6 +192,7 @@ export function VoicePage() {
 
   if (!profile || !isStudentProfile(profile)) return <Navigate to="/" replace />
   const petState: PetState = growthRows.find((g) => g.id === profile.id)?.state ?? 'daily'
+  const petSpecies = speciesFromIdeal(profile.ideal)
 
   return (
     <div className="mx-auto w-full max-w-[1760px] px-6 pb-10 pt-6 lg:px-10">
@@ -246,7 +242,7 @@ export function VoicePage() {
                         {m.image === 'cake' ? (
                           <PixelArt map={cakeMap} palette={cakePalette} size={110} title="像素蛋糕" />
                         ) : (
-                          <img src="/design/pet-baker.png" alt="蛋糕师电子宠物" width={150} className="drop-shadow-sm" />
+                          <PetSprite species={petSpecies} state={petState} size={150} title="你的专属电子宠物" />
                         )}
                         <span className="mt-2 text-xs font-semibold text-grape">
                           {m.image === 'cake' ? '梦想小蛋糕' : '你的专属电子宠物'}
@@ -367,7 +363,7 @@ export function VoicePage() {
             {dream === 'none' && (
               <>
                 <span className="animate-floaty">
-                  <PixelArt map={petMap} palette={petPaletteFor(petState)} size={110} title="小信伙伴" />
+                  <PetSprite species="sprout" state={petState} size={110} title="小信伙伴" />
                 </span>
                 <p className="text-[13px] leading-6 text-ink-soft">
                   还没有电子宠物
@@ -386,9 +382,9 @@ export function VoicePage() {
             )}
             {dream === 'dream' && (
               <>
-                <img src="/design/pet-baker.png" alt="蛋糕师电子宠物" width={150} className="animate-pop drop-shadow-md" />
+                <PetSprite species={petSpecies} state={petState} size={150} className="animate-pop drop-shadow-md" title={`${displayIdeal(profile.ideal)}电子宠物`} />
                 <p className="tag bg-grape-soft text-grape">
-                  {profile.ideal ?? '蛋糕师'} · {profile.name}
+                  {displayIdeal(profile.ideal)} · {profile.name}
                 </p>
               </>
             )}

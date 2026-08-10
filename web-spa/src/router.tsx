@@ -10,7 +10,7 @@ import { StudentHomePage } from '@/pages/student/home/StudentHomePage'
 import { VoicePage } from '@/pages/student/voice/VoicePage'
 import { LetterListPage } from '@/pages/feedback/LetterListPage'
 import { LetterDetailPage } from '@/pages/feedback/LetterDetailPage'
-import { GrowthPage } from '@/pages/student/growth/GrowthPage'
+import { GrowthPage, TeacherStudentGrowthPage } from '@/pages/student/growth/GrowthPage'
 import { TeacherConsoleLayout } from '@/layouts/TeacherConsoleLayout'
 import { TeacherEntryPage } from '@/pages/teacher/entry/TeacherEntryPage'
 import { TeacherSetupPage } from '@/pages/teacher/setup/TeacherSetupPage'
@@ -21,6 +21,7 @@ import { TeacherGrowthPage } from '@/pages/teacher/growth/TeacherGrowthPage'
 import { TeacherCoursesPage } from '@/pages/teacher/courses/TeacherCoursesPage'
 import { TeacherClassroomPage } from '@/pages/teacher/classroom/TeacherClassroomPage'
 import { AdminConfigPage } from '@/pages/admin/AdminConfigPage'
+import { PetPreviewPage } from '@/pages/dev/PetPreviewPage'
 
 function ProtectedLayout() {
   const location = useLocation()
@@ -77,6 +78,8 @@ export const routes: RouteObject[] = [
   { path: '/teacher/register', element: <TeacherRegisterPage /> },
   // admin 自包含 LoginPanel 守卫（ad_ token 在 admin_token 里），不能放 ProtectedLayout 下
   { path: '/admin', element: <AdminConfigPage /> },
+  // 开发用预览页（临时）
+  { path: '/pet-preview', element: <PetPreviewPage /> },
   {
     element: <ProtectedLayout />,
     children: [
@@ -103,6 +106,7 @@ export const routes: RouteObject[] = [
               { path: 'lesson', element: <TeacherLessonPage /> },
               { path: 'academic', element: <TeacherAcademicPage /> },
               { path: 'growth', element: <TeacherGrowthPage /> },
+              { path: 'growth/:studentId', element: <TeacherStudentGrowthPage /> },
               { path: 'courses', element: <TeacherCoursesPage /> },
               { path: 'classroom', element: <TeacherClassroomPage /> },
             ],

@@ -1,20 +1,26 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { letters } from '@/mocks/data'
+import { getLettersForStudent } from '@/mocks/data'
 import { Icon } from '@/components/Icon'
+import { getSession, isStudentProfile } from '@/stores/session'
 
 export function LetterListPage() {
   const [keyword, setKeyword] = useState('')
+  const studentLetters = useMemo(() => {
+    const { profile } = getSession()
+    const studentId = profile && isStudentProfile(profile) ? profile.id : 'wxy'
+    return getLettersForStudent(studentId)
+  }, [])
   const filtered = useMemo(
     () =>
-      letters.filter(
+      studentLetters.filter(
         (l) =>
           !keyword.trim() ||
           l.week.includes(keyword.trim()) ||
           l.preview.includes(keyword.trim()) ||
           l.body.some((b) => b.includes(keyword.trim())),
       ),
-    [keyword],
+    [keyword, studentLetters],
   )
 
   return (

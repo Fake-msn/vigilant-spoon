@@ -1,8 +1,287 @@
 import { ApiClientError } from '@/api/client'
 import { academicRows, courseRecords, regions, students } from '@/mocks/data'
+import { speciesFromIdeal, type PetSpecies } from '@/components/art'
 import type { Profile } from '@/stores/session'
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+type ChatItem = { date: string; topic: string; state: 'daily' | 'gray' | 'cheer'; mins: number }
+type LedgerItem = { id: number; name: string; points: number; note: string | null; created_at: string }
+
+/** 每个学生的宠物数值（growth_value / stage / state / hunger / mood / points_total / level）—— getGrowth 和 getClassPets 共享 */
+const petExtras: Record<string, {
+  stage: number; growth_value: number; state: 'daily' | 'gray' | 'cheer'
+  needs_care: boolean; last_topic: string; hunger: number; mood: number
+  points_total: number; level: number
+}> = {
+  wxy:  { stage: 1, growth_value: 35, state: 'daily', needs_care: false, last_topic: '蛋糕师的梦想', hunger: 40, mood: 65, points_total: 35, level: 1 },
+  lxj:  { stage: 2, growth_value: 62, state: 'cheer', needs_care: false, last_topic: '爷爷的军装',   hunger: 25, mood: 85, points_total: 62, level: 2 },
+  zxh:  { stage: 1, growth_value: 28, state: 'daily', needs_care: false, last_topic: '画梯田的颜色', hunger: 45, mood: 55, points_total: 28, level: 1 },
+  lxh:  { stage: 2, growth_value: 75, state: 'cheer', needs_care: false, last_topic: '星星为什么眨眼', hunger: 20, mood: 90, points_total: 75, level: 2 },
+  cxy:  { stage: 0, growth_value: 12, state: 'gray',  needs_care: true,  last_topic: '想爸爸妈妈',   hunger: 70, mood: 30, points_total: 12, level: 0 },
+  zxj:  { stage: 1, growth_value: 48, state: 'daily', needs_care: false, last_topic: '帮同桌讲题',    hunger: 35, mood: 70, points_total: 48, level: 1 },
+  wxx:  { stage: 0, growth_value: 18, state: 'gray',  needs_care: true,  last_topic: '新学校的第一天', hunger: 65, mood: 35, points_total: 18, level: 0 },
+  zxy2: { stage: 2, growth_value: 55, state: 'daily', needs_care: false, last_topic: '奶奶今天精神好多了', hunger: 30, mood: 75, points_total: 55, level: 2 },
+}
+
+/** 每个学生的积分流水 —— getStudentPoints 使用 */
+const studentLedgers: Record<string, LedgerItem[]> = {
+  wxy: [
+    { id: 1, name: '主动举手发言', points: 5,  note: '分享做蛋糕的心得', created_at: '2026-07-28T10:00:00+00:00' },
+    { id: 2, name: '作业优秀',     points: 15, note: '作文《我的蛋糕梦》', created_at: '2026-07-24T10:00:00+00:00' },
+    { id: 3, name: '回答正确',     points: 10, note: '数学课分数运算',   created_at: '2026-07-22T10:00:00+00:00' },
+  ],
+  lxj: [
+    { id: 1, name: '主动举手发言', points: 5,  note: '讲爷爷当兵的故事', created_at: '2026-07-28T10:00:00+00:00' },
+    { id: 2, name: '作业按时提交', points: 8,  note: null,               created_at: '2026-07-25T10:00:00+00:00' },
+    { id: 3, name: '回答正确',     points: 10, note: '体育课队列指令',   created_at: '2026-07-23T10:00:00+00:00' },
+  ],
+  zxh: [
+    { id: 1, name: '作业优秀',     points: 15, note: '作文《山外面的城市》获优星', created_at: '2026-07-28T10:00:00+00:00' },
+    { id: 2, name: '主动举手发言', points: 5,  note: '美术课分享梯田画作',         created_at: '2026-07-26T10:00:00+00:00' },
+  ],
+  lxh: [
+    { id: 1, name: '回答正确',     points: 10, note: '科学课解释星星眨眼', created_at: '2026-07-28T10:00:00+00:00' },
+    { id: 2, name: '作业优秀',     points: 15, note: '自然观察日记',       created_at: '2026-07-27T10:00:00+00:00' },
+    { id: 3, name: '主动举手发言', points: 5,  note: '提问小苏打实验',     created_at: '2026-07-24T10:00:00+00:00' },
+  ],
+  cxy: [
+    { id: 1, name: '作业按时提交', points: 8, note: null, created_at: '2026-07-28T10:00:00+00:00' },
+  ],
+  zxj: [
+    { id: 1, name: '主动举手发言', points: 5,  note: '带读课文',           created_at: '2026-07-28T10:00:00+00:00' },
+    { id: 2, name: '回答正确',     points: 10, note: '帮同桌讲数学题',     created_at: '2026-07-25T10:00:00+00:00' },
+    { id: 3, name: '作业优秀',     points: 15, note: '读书笔记《给奶奶的故事》', created_at: '2026-07-22T10:00:00+00:00' },
+  ],
+  wxx: [
+    { id: 1, name: '主动举手发言', points: 5, note: '第一次在新班级发言', created_at: '2026-07-28T10:00:00+00:00' },
+    { id: 2, name: '作业按时提交', points: 8, note: null,                created_at: '2026-07-26T10:00:00+00:00' },
+  ],
+  zxy2: [
+    { id: 1, name: '回答正确',     points: 10, note: '健康课讲量体温',     created_at: '2026-07-28T10:00:00+00:00' },
+    { id: 2, name: '作业优秀',     points: 15, note: '作文《我想当医生》', created_at: '2026-07-25T10:00:00+00:00' },
+    { id: 3, name: '主动举手发言', points: 5,  note: '分享奶奶康复的故事', created_at: '2026-07-23T10:00:00+00:00' },
+  ],
+}
+
+/** 根据宠物种类返回个性化的成长承诺、周记文案和谈心记录 */
+function growthFlavor(species: PetSpecies, _ideal: string | null) {
+  const flavors: Record<PetSpecies, {
+    commitments: { id: string; text: string; created_at: string; status: 'fulfilled' | 'active' }[]
+    last_gist: string
+    history: ChatItem[]
+  }> = {
+    baker: {
+      commitments: [
+        { id: 'c1', text: '我要每天帮妈妈做一次家务', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要学会做一个纸杯蛋糕', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '这周揉了面团，离蛋糕师更近一步',
+      history: [
+        { date: '今天',    topic: '蛋糕师的梦想',   state: 'cheer', mins: 6 },
+        { date: '昨天',    topic: '帮妈妈揉面团',   state: 'daily', mins: 5 },
+        { date: '3 天前', topic: '甜甜的纸杯蛋糕', state: 'daily', mins: 8 },
+        { date: '上周',    topic: '第一次说出梦想', state: 'daily', mins: 4 },
+      ],
+    },
+    soldier: {
+      commitments: [
+        { id: 'c1', text: '我要每天早起跑步锻炼身体', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要学会把被子叠成豆腐块', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '听爷爷讲了站岗的故事，我要像他一样勇敢',
+      history: [
+        { date: '今天',    topic: '爷爷的军装',     state: 'cheer', mins: 7 },
+        { date: '昨天',    topic: '学站军姿',       state: 'daily', mins: 5 },
+        { date: '3 天前', topic: '被子叠豆腐块',   state: 'daily', mins: 6 },
+        { date: '上周',    topic: '长大要参军',     state: 'daily', mins: 4 },
+      ],
+    },
+    painter: {
+      commitments: [
+        { id: 'c1', text: '我要把家门口的大山画下来', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要每天画一幅小画送给同学', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '这周画了山外面的城市，用了好多颜色',
+      history: [
+        { date: '今天',    topic: '画梯田的颜色',     state: 'daily', mins: 6 },
+        { date: '昨天',    topic: '山外面的城市',     state: 'daily', mins: 8 },
+        { date: '3 天前', topic: '送给同学的小画',   state: 'cheer', mins: 5 },
+        { date: '上周',    topic: '第一次画梦想',     state: 'daily', mins: 4 },
+      ],
+    },
+    police: {
+      commitments: [
+        { id: 'c1', text: '我要每天按时到校不迟到', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要帮老师维持课间秩序', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '帮老师整理了路队，大家都说我像小警察',
+      history: [
+        { date: '今天',    topic: '整理路队',         state: 'cheer', mins: 5 },
+        { date: '昨天',    topic: '课间秩序小助手',   state: 'daily', mins: 6 },
+        { date: '3 天前', topic: '不迟到打卡',       state: 'daily', mins: 4 },
+        { date: '上周',    topic: '我想当警察',       state: 'daily', mins: 5 },
+      ],
+    },
+    firefighter: {
+      commitments: [
+        { id: 'c1', text: '我要记住家里的逃生路线', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要提醒奶奶注意用火安全', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '学会了灭火器的用法，消防员叔叔夸我认真',
+      history: [
+        { date: '今天',    topic: '学用灭火器',       state: 'cheer', mins: 7 },
+        { date: '昨天',    topic: '家里的逃生路线',   state: 'daily', mins: 5 },
+        { date: '3 天前', topic: '提醒奶奶用火安全', state: 'daily', mins: 4 },
+        { date: '上周',    topic: '消防员叔叔真勇敢', state: 'daily', mins: 6 },
+      ],
+    },
+    pilot: {
+      commitments: [
+        { id: 'c1', text: '我要保护好眼睛不近视', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要每次坐飞机都记下看到的风景', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '折了一架纸飞机飞得好远，以后要开真的飞机',
+      history: [
+        { date: '今天',    topic: '折纸飞机大赛',     state: 'cheer', mins: 6 },
+        { date: '昨天',    topic: '保护眼睛的好习惯', state: 'daily', mins: 5 },
+        { date: '3 天前', topic: '云朵的形状',       state: 'daily', mins: 4 },
+        { date: '上周',    topic: '我想开飞机',       state: 'daily', mins: 5 },
+      ],
+    },
+    astronaut: {
+      commitments: [
+        { id: 'c1', text: '我要每天认识一颗新的星星', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要坚持锻炼身体变强壮', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '今晚看到了北斗七星，离太空又近了一点',
+      history: [
+        { date: '今天',    topic: '认识北斗七星',     state: 'cheer', mins: 7 },
+        { date: '昨天',    topic: '锻炼身体变强壮',   state: 'daily', mins: 5 },
+        { date: '3 天前', topic: '火箭怎么飞上天',   state: 'daily', mins: 6 },
+        { date: '上周',    topic: '我想去太空',       state: 'daily', mins: 4 },
+      ],
+    },
+    engineer: {
+      commitments: [
+        { id: 'c1', text: '我要用积木搭一座结实的桥', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要学好数学画图', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '用树枝搭了小水渠，引水浇了菜地',
+      history: [
+        { date: '今天',    topic: '搭小水渠引水',     state: 'cheer', mins: 8 },
+        { date: '昨天',    topic: '积木桥承重测试',   state: 'daily', mins: 6 },
+        { date: '3 天前', topic: '数学画图练习',     state: 'daily', mins: 5 },
+        { date: '上周',    topic: '我想造大桥',       state: 'daily', mins: 4 },
+      ],
+    },
+    musician: {
+      commitments: [
+        { id: 'c1', text: '我要每天练习唱一首歌', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要学会认五个音符', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '在音乐课上领唱了，同学们都跟着我一起唱',
+      history: [
+        { date: '今天',    topic: '音乐课领唱',       state: 'cheer', mins: 6 },
+        { date: '昨天',    topic: '认五个音符',       state: 'daily', mins: 5 },
+        { date: '3 天前', topic: '练习新歌',         state: 'daily', mins: 7 },
+        { date: '上周',    topic: '我想当音乐家',     state: 'daily', mins: 4 },
+      ],
+    },
+    athlete: {
+      commitments: [
+        { id: 'c1', text: '我要每天绕操场跑两圈', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要学会正确的拉伸动作', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '运动会100米跑了第三名，下次要更快',
+      history: [
+        { date: '今天',    topic: '运动会100米',     state: 'cheer', mins: 7 },
+        { date: '昨天',    topic: '练习拉伸动作',     state: 'daily', mins: 5 },
+        { date: '3 天前', topic: '绕操场跑两圈',     state: 'daily', mins: 6 },
+        { date: '上周',    topic: '我想当运动员',     state: 'daily', mins: 4 },
+      ],
+    },
+    writer: {
+      commitments: [
+        { id: 'c1', text: '我要每天写一篇小日记', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要读完一本故事书并讲给别人听', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '写了一篇关于梯田的作文，老师给了优星',
+      history: [
+        { date: '今天',    topic: '梯田作文获优星',   state: 'cheer', mins: 6 },
+        { date: '昨天',    topic: '读故事书',         state: 'daily', mins: 8 },
+        { date: '3 天前', topic: '写小日记',         state: 'daily', mins: 5 },
+        { date: '上周',    topic: '我想当作家',       state: 'daily', mins: 4 },
+      ],
+    },
+    scientist: {
+      commitments: [
+        { id: 'c1', text: '我要每天观察一颗星星并记录', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要读完《十万个为什么》第一册', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '做了小苏打和醋的实验，泡泡像火山喷发！',
+      history: [
+        { date: '今天',    topic: '星星为什么眨眼',   state: 'cheer', mins: 7 },
+        { date: '昨天',    topic: '小苏打火山实验',   state: 'cheer', mins: 8 },
+        { date: '3 天前', topic: '十万个为什么',     state: 'daily', mins: 6 },
+        { date: '上周',    topic: '观察蚂蚁搬家',     state: 'daily', mins: 5 },
+      ],
+    },
+    teacher: {
+      commitments: [
+        { id: 'c1', text: '我要帮同桌讲会一道数学题', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要把今天学到的故事讲给奶奶听', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '今天带读了课文，老师说我声音很洪亮',
+      history: [
+        { date: '今天',    topic: '帮同桌讲题',       state: 'daily', mins: 6 },
+        { date: '昨天',    topic: '带读课文',         state: 'cheer', mins: 5 },
+        { date: '3 天前', topic: '给奶奶讲故事',     state: 'daily', mins: 7 },
+        { date: '上周',    topic: '站上讲台的梦',     state: 'daily', mins: 4 },
+      ],
+    },
+    doctor: {
+      commitments: [
+        { id: 'c1', text: '我要提醒奶奶按时吃药', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要学会三种伤口的简单处理', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '奶奶今天精神好多了，我帮她量了体温',
+      history: [
+        { date: '今天',    topic: '奶奶今天精神好了',   state: 'daily', mins: 6 },
+        { date: '昨天',    topic: '学量体温',           state: 'daily', mins: 5 },
+        { date: '3 天前', topic: '提醒奶奶吃药',       state: 'daily', mins: 4 },
+        { date: '上周',    topic: '想治病救人',         state: 'daily', mins: 5 },
+      ],
+    },
+    sprout: {
+      commitments: [
+        { id: 'c1', text: '我要认真写下今天最开心的一件事', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要试着和新同学说一句话', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '梦想还在悄悄发芽，我会慢慢找到它',
+      history: [
+        { date: '今天',    topic: '今天开心的事',     state: 'daily', mins: 5 },
+        { date: '昨天',    topic: '和新同学说话',     state: 'daily', mins: 4 },
+        { date: '3 天前', topic: '悄悄发芽的梦想',   state: 'gray',  mins: 6 },
+        { date: '上周',    topic: '第一次见面',       state: 'daily', mins: 4 },
+      ],
+    },
+    cat: {
+      commitments: [
+        { id: 'c1', text: '我要每天认真完成作业', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' },
+        { id: 'c2', text: '我要帮家里做一件力所能及的事', created_at: '2026-07-21T10:00:00+00:00', status: 'active' },
+      ],
+      last_gist: '每天都在慢慢长大',
+      history: [
+        { date: '今天',    topic: '认真完成作业',     state: 'daily', mins: 5 },
+        { date: '昨天',    topic: '帮家里做事',       state: 'daily', mins: 4 },
+        { date: '3 天前', topic: '慢慢长大',         state: 'daily', mins: 5 },
+        { date: '上周',    topic: '第一次见面',       state: 'daily', mins: 4 },
+      ],
+    },
+  }
+  return flavors[species]
+}
 
 /** 统一清洗班级码：去首尾空白 + 强制大写，与 realClient 保持一致 */
 function normalizeClassCode(code: string): string {
@@ -378,32 +657,34 @@ export const mockClient = {
     if (!student) {
       throw new ApiClientError('学生不存在', 404, 'STUDENT_NOT_FOUND')
     }
+    const ideal = student.ideal ?? null
+    const species = speciesFromIdeal(ideal)
+    const flavor = growthFlavor(species, ideal)
+    const extra = petExtras[studentId] ?? petExtras.wxy
+    const stageLabel = extra.stage >= 3 ? 'bloom' : extra.stage === 2 ? 'bud' : extra.stage === 1 ? 'sprout' : 'egg'
     return {
-      ideal: student.ideal ?? null,
-      commitments: [
-        { id: 'c1', text: '我要每天帮妈妈做一次家务', created_at: '2026-07-20T10:00:00+00:00', status: 'fulfilled' as const },
-        { id: 'c2', text: '我要学会做一个纸杯蛋糕', created_at: '2026-07-21T10:00:00+00:00', status: 'active' as const },
-      ],
-      last_gist: '这周揉了面团，离蛋糕师更近一步',
-      growth_value: 35,
-      stage: 'egg',
+      ideal,
+      commitments: flavor.commitments,
+      last_gist: flavor.last_gist,
+      growth_value: extra.growth_value,
+      stage: stageLabel,
       pet: {
-        species: 'cat',
-        stage: 2,
-        state: 'daily' as const,
-        growth_value: 35,
+        species,
+        stage: extra.stage,
+        state: extra.state,
+        growth_value: extra.growth_value,
         last_growth_at: new Date().toISOString(),
-        cheer_until: null,
-        needs_care: false,
+        cheer_until: extra.state === 'cheer' ? new Date(Date.now() + 1000 * 60 * 60 * 72).toISOString() : null,
+        needs_care: extra.needs_care,
         portrait_url: null,
         updated_at: new Date().toISOString(),
-        points_total: 120,
-        level: 2,
-        hunger: 45,
-        mood: 65,
+        points_total: extra.points_total,
+        level: extra.level,
+        hunger: extra.hunger,
+        mood: extra.mood,
       },
       actions: null,
-      history: null,
+      history: flavor.history,
     }
   },
 
@@ -413,8 +694,9 @@ export const mockClient = {
     if (!student) {
       throw new ApiClientError('学生不存在', 404, 'STUDENT_NOT_FOUND')
     }
+    const species = speciesFromIdeal(student.ideal ?? null)
     return {
-      species: 'cat',
+      species,
       stage: 2,
       state: 'daily' as const,
       growth_value: 35,
@@ -603,22 +885,25 @@ export const mockClient = {
     if ($code !== 'LTZ2024') {
       throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     }
-    return students.map((s) => ({
-      student_id: s.id,
-      name: s.name,
-      avatar_seed: s.avatar_seed,
-      pet: {
-        species: 'cat',
-        stage: 2,
-        state: (s.id === 'cxy' || s.id === 'wxx' ? 'gray' : 'daily') as 'daily' | 'gray' | 'cheer',
-        growth_value: 35,
-        last_growth_at: new Date().toISOString(),
-        cheer_until: null,
-        needs_care: s.id === 'cxy' || s.id === 'wxx',
-        portrait_url: null,
-        updated_at: new Date().toISOString(),
-      },
-    }))
+    return students.map((s) => {
+      const extra = petExtras[s.id] ?? petExtras.wxy
+      return {
+        student_id: s.id,
+        name: s.name,
+        avatar_seed: s.avatar_seed,
+        pet: {
+          species: speciesFromIdeal(s.ideal),
+          stage: extra.stage,
+          state: extra.state,
+          growth_value: extra.growth_value,
+          last_growth_at: new Date().toISOString(),
+          cheer_until: extra.state === 'cheer' ? new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString() : null,
+          needs_care: extra.needs_care,
+          portrait_url: null,
+          updated_at: new Date().toISOString(),
+        },
+      }
+    })
   },
 
   // 方案 5.3 管理员后台（mock：内存态）
@@ -769,5 +1054,9 @@ export const mockClient = {
     if ($code !== 'LTZ2024') throw new ApiClientError('班级码不存在', 404, 'CLASS_NOT_FOUND')
     return { items: [] }
   },
-  async getStudentPoints() { await delay(200); return [] },
+  async getStudentPoints(studentId?: string) {
+    await delay(200)
+    if (!studentId) return []
+    return studentLedgers[studentId] ?? []
+  },
 }

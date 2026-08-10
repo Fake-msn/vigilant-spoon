@@ -1,17 +1,12 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { getSession, isStudentProfile } from '@/stores/session'
 import { api } from '@/api/client'
 import type { PetState } from '@/mocks/data'
 import { Icon } from '@/components/Icon'
-import { PixelArt } from '@/components/art/PixelArt'
-import { petMap, petPalette, petPaletteGray, petPaletteCheer } from '@/components/art/pixelData'
+import { PetSprite } from '@/components/art/PetSprite'
 import { KidAvatar } from '@/components/art/KidAvatar'
-
-const statePalette: Record<PetState, Record<string, string>> = {
-  daily: petPalette,
-  gray: petPaletteGray,
-  cheer: petPaletteCheer,
-}
+import type { PetSpecies } from '@/components/art'
 
 const stateConf: Record<PetState, { tag: string; label: string; animate: string }> = {
   daily: { tag: 'bg-brand-soft text-brand', label: '日常', animate: 'animate-floaty' },
@@ -245,11 +240,17 @@ export function TeacherGrowthPage() {
         {sorted.map((g, i) => {
           const conf = stateConf[g.pet.state]
           return (
-            <div key={g.student_id} className="card card-hover p-5 animate-rise" style={{ animationDelay: `${i * 0.05}s` }}>
+            <Link
+              key={g.student_id}
+              to={`/teacher/growth/${g.student_id}`}
+              className="card card-hover p-5 animate-rise block no-underline text-ink"
+              style={{ animationDelay: `${i * 0.05}s` }}
+              title={`查看 ${g.name} 的成长档案`}
+            >
               <div className="flex items-start gap-4">
                 <div className="flex flex-col items-center gap-1.5">
                   <span className={g.pet.state === 'gray' ? 'opacity-80' : conf.animate}>
-                    <PixelArt map={petMap} palette={statePalette[g.pet.state]} size={64} title={`${g.name} 的像素小宠物`} />
+                    <PetSprite species={(g.pet.species as PetSpecies) ?? 'sprout'} state={g.pet.state} size={64} title={`${g.name} 的电子宠物`} />
                   </span>
                 </div>
 
@@ -276,7 +277,7 @@ export function TeacherGrowthPage() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
           )
         })}
       </div>

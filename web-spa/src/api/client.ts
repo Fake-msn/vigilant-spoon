@@ -266,7 +266,7 @@ export const realClient = {
     }
     actions: unknown[] | null
     history: unknown[] | null
-  }>(`/students/${encodeURIComponent(studentId)}/growth`),
+  }>(`/students/${encodeURIComponent(studentId)}/growth?view=full`),
   getPet: (studentId: string) => request<{
     species: string
     stage: number

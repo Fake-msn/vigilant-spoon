@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { letters } from '@/mocks/data'
+import { getLettersForStudent } from '@/mocks/data'
 import { Icon } from '@/components/Icon'
 import { PixelArt } from '@/components/art/PixelArt'
 import { petMap, petPalette } from '@/components/art/pixelData'
+import { getSession, isStudentProfile } from '@/stores/session'
 
 export function LetterDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -11,10 +12,15 @@ export function LetterDetailPage() {
   const [jobRef, setJobRef] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
 
-  const idx = useMemo(() => letters.findIndex((l) => l.id === id), [id])
-  const letter = idx >= 0 ? letters[idx] : null
-  const prev = letters[idx + 1]
-  const next = letters[idx - 1]
+  const studentLetters = useMemo(() => {
+    const { profile } = getSession()
+    const studentId = profile && isStudentProfile(profile) ? profile.id : 'wxy'
+    return getLettersForStudent(studentId)
+  }, [])
+  const idx = useMemo(() => studentLetters.findIndex((l) => l.id === id), [id, studentLetters])
+  const letter = idx >= 0 ? studentLetters[idx] : null
+  const prev = studentLetters[idx + 1]
+  const next = studentLetters[idx - 1]
 
   if (!letter) {
     return (
