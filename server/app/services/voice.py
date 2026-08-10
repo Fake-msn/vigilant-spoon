@@ -328,7 +328,11 @@ class DashScopeVoiceProvider(VoiceProvider):
 
     def send_audio(self, pcm16: bytes) -> None:
         if not pcm16 or self._agent is None:
-            print(f"[VOICE-DEBUG] send_audio skipped: pcm16={len(pcm16)} agent={self._agent}", flush=True)
+            print(
+                f"[VOICE-DEBUG] send_audio skipped: "
+                f"pcm16={len(pcm16)} agent={self._agent}",
+                flush=True,
+            )
             return
         b64 = base64.b64encode(pcm16).decode("ascii")
         print(f"[VOICE-DEBUG] send_audio: {len(pcm16)} bytes -> agent", flush=True)
@@ -337,7 +341,7 @@ class DashScopeVoiceProvider(VoiceProvider):
                 ClientEvents.ClientAudioAppendEvent(
                     session_id=self._session_id,
                     audio=b64,
-                    format={"type": "audio/pcm", "rate": 16000},
+                    format={"type": "audio/pcm", "rate": 16000},  # type: ignore[arg-type]
                 )
             )
         )

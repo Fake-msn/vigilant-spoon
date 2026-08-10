@@ -696,14 +696,14 @@ export const mockClient = {
   },
 
   async updateCommitments(
-    studentId: string,
+    _studentId: string,
     commitments: { id: string; text: string; created_at?: string | null; status: 'active' | 'fulfilled' | 'expired' }[],
   ) {
     await delay(200)
     const now = new Date().toISOString()
     return commitments
       .filter((c) => c && c.text && c.text.trim().length > 0)
-      .map((c, idx, arr) => {
+      .map((c, _idx, arr) => {
         // 基于 id 去重（只保留最后一个）
         const lastIdx = arr.findIndex((x) => x.id === c.id)
         if (lastIdx !== arr.indexOf(c)) return null
@@ -1087,5 +1087,29 @@ export const mockClient = {
     await delay(200)
     if (!studentId) return []
     return studentLedgers[studentId] ?? []
+  },
+
+  // 信箱（mock：空列表，演示态不生成真实信件）
+  async getLetters(_studentId: string) {
+    await delay(200)
+    return [] as {
+      letter_id: string
+      student_id: string
+      title: string
+      body: string
+      generated_at: string
+      source: 'template' | 'llm'
+      is_read: boolean
+    }[]
+  },
+  async generateLetter(_studentId: string) {
+    await delay(200)
+    return { job_id: `letter-${Date.now().toString(36)}` }
+  },
+
+  // 学生自定义头像上传（mock：不落盘，返回空 URL，前端会回退到默认 SVG）
+  async uploadAvatar(_studentId: string, _file: File) {
+    await delay(200)
+    return { avatar_url: '' }
   },
 }

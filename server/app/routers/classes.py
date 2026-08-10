@@ -74,7 +74,8 @@ def create_class(req: ClassCreateReq) -> ClassCreateResp:
         region_name = REGION_NAMES.get(req.region_key, req.region_key)
 
         conn.execute(
-            "INSERT INTO classes (class_code, class_name, school, region_key, city, county, town, grade, class_no) "
+            "INSERT INTO classes (class_code, class_name, school, "
+            "region_key, city, county, town, grade, class_no) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 code,
@@ -181,7 +182,8 @@ def create_class(req: ClassCreateReq) -> ClassCreateResp:
             now_dt = datetime.now()
             conn.execute(
                 "INSERT INTO letters "
-                "(letter_id, student_id, title, date, preview, body, generated_at, source, is_read) "
+                "(letter_id, student_id, title, date, preview, "
+                "body, generated_at, source, is_read) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     f"{student_id}-welcome",
@@ -224,7 +226,8 @@ def get_class(class_code: str) -> ClassInfo:
             raise _class_not_found(class_code)
 
         student_rows = conn.execute(
-            "SELECT student_id, name, student_no, grade, avatar_seed, role, ideal, custom_avatar_url "
+            "SELECT student_id, name, student_no, grade, "
+            "avatar_seed, role, ideal, custom_avatar_url "
             "FROM students WHERE class_code = ? ORDER BY student_no",
             (class_code,),
         ).fetchall()
@@ -242,7 +245,11 @@ def get_class(class_code: str) -> ClassInfo:
                 region_key=class_row["region_key"],
                 region_name=region_name,
                 ideal=row["ideal"],
-                custom_avatar_url=row["custom_avatar_url"] if "custom_avatar_url" in row.keys() else None,
+                custom_avatar_url=(
+                    row["custom_avatar_url"]
+                    if "custom_avatar_url" in row.keys()
+                    else None
+                ),
             )
             for row in student_rows
         ]

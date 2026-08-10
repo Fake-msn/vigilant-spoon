@@ -505,7 +505,7 @@ function CommitmentsEditor({
     } catch (err) {
       const detail =
         err && typeof err === 'object' && 'status' in err && 'code' in err
-          ? `（HTTP ${(err as any).status} · ${(err as any).code || 'UNKNOWN'}）`
+          ? `（HTTP ${(err as { status?: number }).status} · ${(err as { code?: string }).code || 'UNKNOWN'}）`
           : ''
       setToast(`保存失败：${err instanceof Error ? err.message : String(err)}${detail}，请刷新后重试`)
       setTimeout(() => setToast(null), 5000)
@@ -1046,7 +1046,7 @@ export function TeacherStudentGrowthPage() {
   const displayName = matchedStudent?.name ?? studentId ? (() => {
     // 兜底显示：用 session profile 中的该学生信息 或 class pets 列表；这里简单显示带 studentId 的友好名
     const { profile } = getSession()
-    return profile?.role === 'teacher' && profile?.class_code
+    return profile && !isStudentProfile(profile) && profile.class_code
       ? `学生 ${studentId}`
       : `学生 ${studentId}`
   })() : null
@@ -1057,7 +1057,6 @@ export function TeacherStudentGrowthPage() {
           id: matchedStudent.id,
           name: matchedStudent.name,
           grade: matchedStudent.grade,
-          region_name: matchedStudent.region_name ?? '龙头山镇中心小学',
           avatar_seed: matchedStudent.avatar_seed,
         }
       : studentId && growth
@@ -1065,8 +1064,7 @@ export function TeacherStudentGrowthPage() {
             id: studentId,
             name: displayName || `学生 ${studentId}`,
             grade: '',
-            region_name: '龙头山镇中心小学',
-            avatar_seed: `student_${studentId}`,
+            avatar_seed: 0,
           }
         : null
 

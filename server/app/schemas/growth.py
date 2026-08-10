@@ -21,7 +21,9 @@ class CommitmentInput(BaseModel):
     id: str = Field(..., description="承诺 ID，前端生成的唯一字符串")
     text: str = Field(..., min_length=1, description="承诺内容")
     created_at: datetime | None = Field(default=None, description="创建时间（空=当下）")
-    status: Literal["active", "fulfilled", "expired"] = Field(default="active", description="承诺状态")
+    status: Literal["active", "fulfilled", "expired"] = Field(
+        default="active", description="承诺状态"
+    )
 
 
 class CommitmentsPatch(BaseModel):

@@ -72,12 +72,6 @@ export function IdentityPage() {
     [keyword, students],
   )
 
-  const { profile } = getSession()
-  if (profile) {
-    const target = isStudentProfile(profile) ? '/student' : '/teacher'
-    return <Navigate to={target} replace />
-  }
-
   const submitCode = useCallback(async () => {
     setError(null)
     setLoading(true)
@@ -92,6 +86,13 @@ export function IdentityPage() {
       setLoading(false)
     }
   }, [code])
+
+  // 已登录用户直接重定向（须在所有 Hook 之后，避免条件 return 违反 Hooks 规则）
+  const { profile } = getSession()
+  if (profile) {
+    const target = isStudentProfile(profile) ? '/student' : '/teacher'
+    return <Navigate to={target} replace />
+  }
 
   const enter = async () => {
     if (!selected) return

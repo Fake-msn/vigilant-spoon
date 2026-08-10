@@ -268,13 +268,15 @@ def update_commitments(
             if isinstance(item, dict) and item.get("id"):
                 old_status[str(item["id"])] = str(item.get("status", "active"))
         extra_growth = 0
-        for c in normalized:
-            prev = old_status.get(c.id, "active")
-            if prev != "fulfilled" and c.status == "fulfilled":
+        for nc in normalized:
+            prev = old_status.get(nc.id, "active")
+            if prev != "fulfilled" and nc.status == "fulfilled":
                 extra_growth += 1
 
         conn.execute(
-            "UPDATE growth_records SET commitments = ?, growth_value = growth_value + ?, last_growth_at = ? WHERE student_id = ?",
+            "UPDATE growth_records SET commitments = ?, "
+            "growth_value = growth_value + ?, last_growth_at = ? "
+            "WHERE student_id = ?",
             (
                 serialized,
                 extra_growth,

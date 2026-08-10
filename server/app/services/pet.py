@@ -67,7 +67,8 @@ def species_for_ideal(ideal: str | None) -> str:
     if text in exact:
         return exact[text]
 
-    # 关键词模糊匹配（顺序敏感：警察/消防等新增职业排在军人之前，避免"警察"被旧规则误匹配为 soldier）
+    # 关键词模糊匹配（顺序敏感：警察/消防等新增职业排在军人之前，
+    # 避免"警察"被旧规则误匹配为 soldier）
     keyword_rules: list[tuple[str, str]] = [
         ("蛋糕", "baker"),
         ("烘焙", "baker"),

@@ -1,5 +1,6 @@
 """小信 FastAPI 入口。"""
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -14,7 +15,6 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import app.schemas as schemas_module
-import logging
 from app.db.migrate import ensure_migrated
 from app.routers import (
     academic,
@@ -28,6 +28,7 @@ from app.routers import (
     points,
     session,
 )
+
 # voice_ws 依赖 agentscope，当 mcp/agentscope 版本不兼容时会阻断整个服务启动；
 # 为保持防御性降级（核心业务 / 登录 / 课堂 路由不受影响），这里做 try/except 导入。
 try:
