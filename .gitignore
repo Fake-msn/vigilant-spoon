@@ -1,30 +1,51 @@
+﻿# 依赖与构建产物
 node_modules/
-.DS_Store
 dist/
 build/
-.env
-.env.local
-*.log
-.vscode/
-.idea/
+.next/
+
+# Python
 __pycache__/
 *.pyc
-.next/
+server/.venv/
+*.egg-info/
 coverage/
-# 运行时生成的静态资源（班宠画像等）
-server/app/static/
-# 运行时本地数据库（可随时 seed 重建）
+
+# 运行时数据
 server/data/
 server/app.db
-# Python 虚拟环境
-server/.venv/
-# 头像上传运行时目录
+server/app/static/
 server/app/static/avatars/
-# 临时文件与调试脚本
-.commit-msg.txt
-.tmp_*
-check_config.py
+*.db
+*.sqlite3
+
+# 环境与本地配置
+.env
+.env.*
+!.env.example
+envs/
+
+# IDE / 系统 / AI 工具
+.vscode/
+.idea/
+.trae/
+.arts/
+.codeartsdoer/
+.DS_Store
+*.log
+
 # 旧 Next.js 前端（已迁移至 web-spa）
 web/
-# IDE 配置
-.trae/
+
+# 临时 / 调试 / 诊断脚本（本地开发用，不入库）
+.tmp_*
+.commit-msg.txt
+check_config.py
+diag_*.py
+server/14.0
+server/_verify*.py
+server/scripts/_*.py
+server/scripts/smoke_*.py
+server/scripts/spike_*.py
+server/scripts/*.wav
+.ssh-tools/
