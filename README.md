@@ -1,14 +1,14 @@
 ﻿# 小信伙伴 · Xiaoxin
 
 > 面向乡村小学的 AI 思政谈心伙伴 + 教师备课协作平台
-> 「小有可为」比赛参赛作品
+> 「小有可为」比赛参赛作品 · 团队开发 · 已开源
 
 小信是一款面向乡村小学思政教育场景的 AI 应用：学生通过**实时语音**与 AI 伙伴谈心，在轻松对话中表达理想；教师端提供班级管理、学情导入、备课生成、书信批改、班级宠物墙等完整教学辅助工具链。
 
-**双仓库**
-- 🎯 GitHub 主仓库（本页）：`Fake-msn/vigilant-spoon`
-- 🎨 Gitee 开发仓库：`xiaoxin_10/a-little-trust`
-- 🚀 ModelScope 部署版（deploy-studio 子目录）：`studios/little0hope/xiaoxin`
+**三平台开源**
+- 🐙 GitHub 主仓库（本页）：[Fake-msn/vigilant-spoon](https://github.com/Fake-msn/vigilant-spoon) — 完整源码 + README + CI
+- 🏝️ 魔塔社区创空间：[studios/little0hope/xiaoxin](https://www.modelscope.cn/studios/little0hope/xiaoxin) — 在线体验 + Docker 部署版
+- 🎨 Gitee 历史开发仓库：`xiaoxin_10/a-little-trust` — 开发期 commit 历史（迁移自 Gitee，当前主推 GitHub）
 
 ---
 
@@ -415,4 +415,8 @@ POST /api/admin/config
 
 ## 📜 License
 
-本项目为「小有可为」比赛参赛作品，暂未开源，版权归作者所有。
+本项目为**「小有可为」比赛参赛作品**，由**小信团队**开发，已通过 **GitHub** 与 **魔塔社区（ModelScope）** 双平台开源。
+
+当前采用 **MIT License**，欢迎 Fork / PR / 二次创作。若用于商业用途，请保留原始版权声明与项目出处。
+
+> 项目历史开发 commit 保留于 Gitee（`xiaoxin_10/a-little-trust`），当前主仓库迁移至 GitHub 与魔塔社区。

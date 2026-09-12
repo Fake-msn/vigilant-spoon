@@ -49,3 +49,11 @@ server/scripts/smoke_*.py
 server/scripts/spike_*.py
 server/scripts/*.wav
 .ssh-tools/
+
+# AI / IDE 工具（根目录残留）
+
+.tmp_*.ps1
+
+.tmp_*.json
+
+deploy-xiaoxin/
