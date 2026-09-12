@@ -45,7 +45,7 @@
 - **学情汇总 API**：带 trend 的分数趋势统计
 
 ### 📝 书信系统
-- 学生可生成致理想职业的书信（模板填槽）
+- 学生可生成致理想职业的书信（优先 LLM 生成，失败回退模板；需关怀学生自动检索 RAG 评语范例）
 - 教师可批改、阅读学生书信
 - 支持已读/未读状态标记
 
@@ -70,8 +70,9 @@
    - 22/22 端到端测试全过，关键字段引用 100%
 
 2. **AI 负责聪明**（Intelligence）
-   - 仅在"需要想象力"的环节调用大模型：语音对话（DashScope Realtime）
-   - 书信、备课、评分**一律模板/规则**，零模型消耗、零幻觉风险
+   - 5 条在线模型调用路径已就绪：语音对话（RealtimeAgent）、文本 LLM（书信/评分）、文生图（班宠画像）、RAG embedding（评语检索），全部默认禁用，管理员可在后台或 env 按需打开
+   - 备课当前仍是纯模板（规划中接 LLM）；宠物三态机铁律禁 LLM
+   - 默认配置下"零模型依赖"（voice=local, text=template, image=placeholder, embed=disabled），所有组件均有模板/占位/纯规则兜底
    - ModelScope 等平台的算力不稳定时，系统可切到 Local 脚本模式**完全离线运行**
 
 3. **环境自适应**（Portability）
@@ -244,7 +245,7 @@ docker run -p 7860:7860 \
 | R2-T | POST | `/api/session/teacher/enter` | 教师登录 |
 | R3 | GET | `/api/students/{id}/growth` | 成长档案 |
 | R4 | GET | `/api/students/{id}/pet` | 电子宠物三态 |
-| R5 | POST | `/api/students/{id}/pet/portrait` | 生成宠物画像（占位） |
+| R5 | POST | `/api/students/{id}/pet/portrait` | 生成宠物画像（placeholder 占位图 / DashScope 文生图） |
 | R6 | GET | `/api/jobs/{id}` | 异步任务轮询 |
 | R7 | GET | `/api/students/{id}/letters` | 书信列表 |
 | R8 | POST | `/api/students/{id}/letters/generate` | 书信生成 |
@@ -368,16 +369,46 @@ npm run lint          # ESLint
 
 ## ⚠️ 模型接入现状
 
-**当前唯一真正调用在线模型的是语音对话服务**（DashScope Realtime）。书信、备课、评分、班宠画像均为模板/规则实现，零模型依赖：
+> **事实核查**（基于 commit 47f583c + 956e3c5 feat: 模型接入方案 5.1-5.3）：下表是代码真实实现。旧版 docs/模型接入方案.md（956e3c5 之前）中的"班宠画像未实现 / 书信纯模板 / RAG 不存在"等描述已**全部过时**。
 
-| 组件 | 模型接入 |
-|------|---------|
-| 语音对话 | ✅ DashScope Realtime（OpenAI-realtime 兼容） |
-| 评分 / 宠物三态 / 结算 | ❌ 纯函数/规则（铁律禁 LLM） |
-| 书信 / 备课 | ❌ 模板填槽 / 模板拼装 |
-| 班宠画像 | ❌ 占位（未实现） |
+### 代码已实现的 5 条在线模型调用路径
 
-`VOICE_PROVIDER=local` 模式下**全系统零模型依赖**，可完全离线演示。
+| # | 组件 | Service | 模型类型 | Provider 枚举 | 默认 | 兜底策略 |
+|---|------|---------|---------|--------------|------|---------|
+| 1 | 语音对话 | services/voice.py | DashScope Realtime（AgentScope RealtimeAgent） | local / dashscope | local | Local 脚本回放 |
+| 2 | 文本 LLM | services/llm.py | DashScope qwen-plus / OpenAI 兼容 | template / dashscope / openai | template | 返回 None，调用方回模板 |
+| 3 | 文生图 | services/imagegen.py | DashScope Wanx2.1 文生图 | placeholder / dashscope | placeholder | 本地生成纯占位 PNG |
+| 4 | RAG Embedding | services/rag.py | DashScope text-embedding-v3 | disabled / dashscope | disabled | add_document no-op，search 返回空 |
+| 5 | 管理员后台 | routers/admin.py | 运行时覆盖以上 provider | service_config DB 表 | Settings 默认 | 未写 DB 时用 Settings |
+
+### 各业务组件实际模型行为
+
+| 组件 | 模型策略 | 代码事实 |
+|------|---------|---------|
+| 语音对话 | **唯一默认启用在线模型**（voice=local 回脚本） | AgentScope RealtimeAgent + DashScopeRealtimeModel 完整实现 |
+| 书信生成 | **LLM 优先 + 模板兜底**；需关怀学生自动调 RAG | letter.py::generate_letter() 先 _generate_with_llm() 再 chat_completion()，失败回模板 |
+| 评分 | **LLM 优先 + 关键词兜底** | scoring.py::score_transcript() 先 _score_with_llm()，失败回确定性关键词打分 |
+| 备课 | 模板拼装（**不调 LLM**） | 规划中接 LLM，当前代码纯模板 |
+| 班宠画像 | placeholder 占位图 / dashscope 真实文生图 | imagegen.py 完整实现 submit 轮询 下载落盘；growth.py::create_portrait() 真实调用 |
+| 宠物三态机 | **铁律禁 LLM，纯函数状态机** | 不调任何模型 |
+| 结算链 | 纯编排（调用 pet + scoring） | 评分可走 LLM，但 pet 铁律禁 LLM |
+
+### 管理员后台动态配置
+
+runtime_config.py 提供 "Settings 默认值 → DB service_config 表覆盖" 两级优先级。管理员可通过 POST /api/admin/config 在运行时切换 provider、填 API key，无需重启：
+
+开启 DashScope 语音 + 文本 LLM + 文生图：
+POST /api/admin/config
+{ voice_provider: dashscope, dashscope_api_key: sk-xxx, text_provider: dashscope, text_api_key: sk-xxx, image_provider: dashscope, image_api_key: sk-xxx }
+
+### 演示铁律（永不崩）
+
+所有 5 条模型路径均有**双保险兜底**：
+
+1. Provider 未配置（template / placeholder / disabled / local）→ 直接跳过在线调用
+2. Provider 已配置但 key 缺失 / 网络异常 / LLM 输出解析失败 → 返回 None / 回模板 / 回占位图
+
+默认配置下**全系统零模型依赖**，可完全离线演示。
 
 ---
 
