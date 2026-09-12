@@ -1,9 +1,27 @@
-﻿# 小信 · Xiaoxin
+﻿# 小信伙伴 · Xiaoxin
 
 > 面向乡村小学的 AI 思政谈心伙伴 + 教师备课协作平台
-> 「小有可为」比赛作品
+> 「小有可为」比赛参赛作品
 
 小信是一款面向乡村小学思政教育场景的 AI 应用：学生通过**实时语音**与 AI 伙伴谈心，在轻松对话中表达理想；教师端提供班级管理、学情导入、备课生成、书信批改、班级宠物墙等完整教学辅助工具链。
+
+**双仓库**
+- 🎯 GitHub 主仓库（本页）：`Fake-msn/vigilant-spoon`
+- 🎨 Gitee 开发仓库：`xiaoxin_10/a-little-trust`
+- 🚀 ModelScope 部署版（deploy-studio 子目录）：`studios/little0hope/xiaoxin`
+
+---
+
+## 🎬 比赛展示
+
+- **展示视频**（双版本 · HyperFrames 合成）
+  - 🎞️ 横版 75s（哔哩哔哩）：`video-assets/final/showcase-h/`
+  - 📱 竖版 60s（小红书）：`video-assets/final/showcase-v/`
+  - 📋 交付说明：[docs/showcase-video/delivery.md](docs/showcase-video/delivery.md)
+  - 🎨 分镜表：[docs/showcase-video/storyboard.md](docs/showcase-video/storyboard.md)
+  - 🗣️ 术语白话映射：[docs/showcase-video/jargon-map.md](docs/showcase-video/jargon-map.md)
+- **小红书笔记预览**：`shanqu-mengxiang-ai/index.html`
+- **测试截图**（各端入口/主流程）：`a8-03-screenshots/`
 
 ---
 
@@ -34,7 +52,32 @@
 ### 🔑 鉴权体系
 - 双 token 类型：学生 `st_` / 教师 `tch_` / 管理员 `ad_`
 - **进程内内存会话存储**（已适配 ModelScope 创空间 OSS-FUSE 环境）
-- 同时支持 `X-Auth-Token` 和 `Authorization: Bearer` 两种 header
+- 同时支持 `X-Auth-Token` 和 `Authorization: Bearer` 两种 header（平台网关剥除 Authorization 时自动切换）
+
+### 🎛️ Demo 模式
+- 学生端/教师端均内置 DemoModeToggle，便于课堂演示快速切换
+
+---
+
+## 🏰 三条技术护城河
+
+> 来源：`docs/showcase-video/storyboard.md`
+> 确保"稳的部分稳、聪明的部分聪明"，不会因为 AI 不稳定影响核心教学场景
+
+1. **规则兜底**（Reliability）
+   - 宠物三态机、评分、结算链全部纯函数/规则实现，**铁律禁 LLM**
+   - 关键数据（梦想、职业、教师评语）100% 确定性，老师看到的永远准确无误
+   - 22/22 端到端测试全过，关键字段引用 100%
+
+2. **AI 负责聪明**（Intelligence）
+   - 仅在"需要想象力"的环节调用大模型：语音对话（DashScope Realtime）
+   - 书信、备课、评分**一律模板/规则**，零模型消耗、零幻觉风险
+   - ModelScope 等平台的算力不稳定时，系统可切到 Local 脚本模式**完全离线运行**
+
+3. **环境自适应**（Portability）
+   - SQLite 本地可跑，ModelScope 创空间 OSS-FUSE 挂载通过内存会话存储规避一致性问题
+   - 平台网关剥除 `Authorization` header → 自动切换 `X-Auth-Token`
+   - agentscope/mcp 版本不兼容 → 语音路由 try/except 防御性加载，核心业务（登录/班级/教师端）不受影响
 
 ---
 
@@ -62,7 +105,6 @@
 
 外部服务（可选）：
   · DashScope Realtime (语音) — 基于 AgentScope
-  · DashScope API Key (openai>=1.50 兼容)
   · APScheduler (定时任务)
 ```
 
@@ -79,7 +121,7 @@
 | 前端框架 | React 18.3 + React Router v6 |
 | 构建工具 | Vite + TypeScript + TailwindCSS v4 |
 | 测试 | pytest (后端) + vitest (前端) |
-| MCP | mcp ≥1.13,<2.0 |
+| CI | CircleCI（ruff / mypy / pytest / eslint / tsc / build） |
 | Python | ≥3.10 |
 
 ---
@@ -87,38 +129,40 @@
 ## 📁 项目结构
 
 ```
-xiaoxin_github/
+xiaoxing_github/
 ├── server/                 # 后端（FastAPI）
 │   ├── app/
 │   │   ├── routers/        # 业务路由（11 个模块）
-│   │   ├── services/      # 业务逻辑（voice/letter/pet/rag 等）
+│   │   ├── services/      # voice / letter / pet / rag 等
 │   │   ├── schemas/       # Pydantic 模型（API 契约唯一真源）
-│   │   ├── db/
-│   │   │   └── migrations/ # SQL 迁移 0001 ~ 0014
+│   │   ├── db/migrations/ # SQL 迁移 0001 ~ 0014
 │   │   ├── main.py        # FastAPI 入口 + SPA fallback
-│   │   ├── config.py      # 配置项（pydantic-settings）
-│   │   ├── deps.py        # 鉴权依赖（X-Auth-Token + 内存会话）
-│   │   └── session_store.py # 进程内会话存储
-│   ├── scripts/
-│   │   └── seed.py        # 演示数据灌入（首次启动自动执行）
+│   │   ├── deps.py        # 鉴权（X-Auth-Token + 内存会话）
+│   │   └── session_store.py # 进程内会话存储（OOM-FUSE 适配）
+│   ├── scripts/seed.py    # 演示数据灌入
 │   ├── tests/             # pytest 测试集
-│   └── pyproject.toml     # 后端依赖
+│   └── pyproject.toml
 ├── web-spa/                # 前端（Vite + React）
-│   ├── src/
-│   │   ├── pages/         # 学生端 + 教师端页面
-│   │   ├── stores/        # Zustand 会话存储
-│   │   ├── api/client.ts  # 前端 API 客户端（X-Auth-Token）
-│   │   └── ws/            # WebSocket 语音客户端
-│   └── package.json       # 前端依赖
+│   ├── src/pages/         # 学生端 + 教师端页面
+│   ├── stores/session.ts  # Zustand 会话
+│   ├── api/client.ts      # API 客户端（X-Auth-Token）
+│   └── ws/                # WebSocket 语音客户端
+├── deploy-studio/          # ModelScope 创空间部署版（独立 Docker 构建）
+│   ├── Dockerfile
+│   ├── deploy-entrypoint.sh
+│   ├── server/             # 与根目录 server 同源，含 session_store.py
+│   └── web-spa/            # 与根目录 web-spa 同源
 ├── docs/                   # 设计与验收文档
-│   ├── acceptance.md          # F5 联调验收报告（22/22 通过）
-│   ├── acceptance_matrix.md   # 验收用例矩阵
-│   ├── api-changelog.md       # API 契约变更日志（v2.1 冻结）
-│   ├── demo-script.md         # 演示谈心脚本
-│   ├── rehearsal.md           # 彩排脚本
-│   └── 模型接入方案.md        # 模型接入现状与规划
-├── Dockerfile              # ModelScope 创空间单容器构建
-├── deploy-entrypoint.sh    # 容器启动脚本（seed + uvicorn）
+│   ├── acceptance.md
+│   ├── acceptance_matrix.md
+│   ├── api-changelog.md
+│   ├── demo-script.md
+│   ├── 模型接入方案.md
+│   └── showcase-video/     # 展示视频完整交付包
+├── video-assets/           # 展示视频成片资产（横版/竖版 MP4 + 配音 WAV）
+├── shanqu-mengxiang-ai/   # 小红书笔记单页预览（HTML）
+├── a8-03-screenshots/     # 测试截图
+├── .circleci/config.yml    # CircleCI 流水线
 └── .gitignore
 ```
 
@@ -136,20 +180,18 @@ xiaoxin_github/
 ```bash
 cd server
 
-# 创建虚拟环境
 python -m venv .venv
 # Windows
 .venv\Scripts\activate
 # macOS/Linux
 source .venv/bin/activate
 
-# 安装依赖
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple ./
 
-# 灌入演示数据（首次启动时会自动执行 seed.py）
+# 灌入演示数据（首次启动自动执行）
 python scripts/seed.py
 
-# 启动服务
+# 启动
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -169,57 +211,52 @@ npm run test           # vitest 单测
 
 ```bash
 # .env.example
-DASHSCOPE_API_KEY=             # DashScope Realtime 语音密钥（留空用 local 脚本）
+DASHSCOPE_API_KEY=             # DashScope Realtime 密钥（留空用 local 脚本）
 VOICE_PROVIDER=local           # local | dashscope
 VOICE_MODEL=qwen3-omni-flash-realtime
-DATABASE_PATH=./demo.db        # SQLite 路径
+DATABASE_PATH=./demo.db
 ```
 
-### Docker 部署（ModelScope 创空间）
+### ModelScope 创空间 Docker 部署
 
 ```bash
-# 多阶段构建（Node 构建前端 + Python 后端）
-docker build -t xiaoxin .
+cd deploy-studio
 
-# 启动（暴露 7860，数据库持久化到 /mnt/workspace）
+docker build -t xiaoxin .
 docker run -p 7860:7860 \
   -e DATABASE_PATH=/mnt/workspace/demo.db \
   -v $(pwd)/data:/mnt/workspace \
   xiaoxin
 ```
 
-容器启动时 `deploy-entrypoint.sh` 会自动：
-1. 确保 `/mnt/workspace` 存在
-2. 首次运行时灌入 seed 演示数据
-3. 启动 uvicorn 监听 `0.0.0.0:7860`
+容器启动脚本 `deploy-entrypoint.sh` 自动：建目录 → 首次 seed → 起 uvicorn（监听 `0.0.0.0:7860`）。
 
 ---
 
 ## 🔌 API 契约（v2.1 · 已冻结）
 
-完整列表见 [docs/api-changelog.md](./docs/api-changelog.md)，核心接口如下：
+完整列表见 [docs/api-changelog.md](docs/api-changelog.md)。核心接口：
 
 | # | 方法 | 路径 | 描述 |
 |---|------|------|------|
-| R1 | GET | `/api/classes/{code}` | 获取班级信息与学生列表 |
-| R2 | POST | `/api/session/enter` | 学生登录，返回 `st_` token |
+| R1 | GET | `/api/classes/{code}` | 班级信息 + 学生列表 |
+| R2 | POST | `/api/session/enter` | 学生登录 → `st_` token |
 | R2-T | POST | `/api/session/teacher/enter` | 教师登录 |
-| R3 | GET | `/api/students/{id}/growth` | 学生成长档案 |
-| R4 | GET | `/api/students/{id}/pet` | 学生电子宠物状态 |
-| R5 | POST | `/api/students/{id}/pet/portrait` | 生成宠物画像 |
+| R3 | GET | `/api/students/{id}/growth` | 成长档案 |
+| R4 | GET | `/api/students/{id}/pet` | 电子宠物三态 |
+| R5 | POST | `/api/students/{id}/pet/portrait` | 生成宠物画像（占位） |
 | R6 | GET | `/api/jobs/{id}` | 异步任务轮询 |
 | R7 | GET | `/api/students/{id}/letters` | 书信列表 |
-| R8 | POST | `/api/students/{id}/letters/generate` | 生成书信 |
+| R8 | POST | `/api/students/{id}/letters/generate` | 书信生成 |
 | R9 | POST | `/api/lesson/generate` | 备课生成 |
-| R10 | GET | `/api/lessons/{id}` | 教案详情 |
-| R11-13 | POST/GET | `/api/classroom/*` | 班级会话控制 |
+| R11-13 | POST/GET | `/api/classroom/*` | 班级会话 start/control/status |
 | R14 | POST | `/api/classes/{code}/academic` | 学情批量导入 |
 | R15 | GET | `/api/classes/{code}/academic` | 学情汇总 |
 | R16 | GET | `/api/classes/{code}/lessons` | 班级课程列表 |
 | R17 | GET | `/api/classes/{code}/pets` | 班级宠物墙 |
-| WS | WS | `/api/ws/voice?token=st_xxx` | 语音 WebSocket |
+| WS | WS | `/api/ws/voice?token=st_xxx` | 实时语音 WebSocket |
 
-所有受保护接口在 `X-Auth-Token` header 或 `Authorization: Bearer <token>` 中携带 token。
+所有受保护接口从 `X-Auth-Token` 或 `Authorization: Bearer` 取 token。
 
 ---
 
@@ -228,8 +265,8 @@ docker run -p 7860:7860 \
 | 角色 | 入口 | Token 前缀 | 用途 |
 |------|------|-----------|------|
 | 学生 | `http://localhost:5173/` 身份页 → 登录 | `st_` | 语音谈心、看宠物、读书信 |
-| 教师 | `http://localhost:5173/teacher/entry` | `tch_` | 学情导入、备课、班级管理 |
-| 管理员 | 后端 `/api/admin/config` | `ad_` | 系统配置 |
+| 教师 | `http://localhost:5173/teacher/entry` | `tch_` | 学情导入、备课、班级管理、多班级切换 |
+| 管理员 | 后端 `/api/admin/config` | `ad_` | 系统配置、Demo 快速入口 |
 
 演示班级：**LTZ2024 三（1）班 · 龙头山镇中心小学**，预置 8 名学生。
 
@@ -237,9 +274,9 @@ docker run -p 7860:7860 \
 
 ## 📊 验收结果（F5）
 
-> 来源：[docs/acceptance.md](./docs/acceptance.md)
+> 来源：[docs/acceptance.md](docs/acceptance.md)
 
-- ✅ 22 / 22 用例通过
+- ✅ **22 / 22** 端到端用例通过
 - 🎙️ 语音首响 P50：**0.507s**（目标 <2s）
 - 🖼️ 生图耗时：**0.01s**
 - 📨 信件生成：**0.01s**
@@ -249,10 +286,10 @@ docker run -p 7860:7860 \
 
 ## 🗂️ 数据库迁移
 
-项目自带 14 版本 SQL 迁移链，位于 `server/app/db/migrations/`：
+14 版本 SQL 迁移链，`ensure_migrated()` 启动时自动应用：
 
-| 版本 | 描述 |
-|------|------|
+| # | 描述 |
+|---|------|
 | 0001 | 基础 schema（students / classes） |
 | 0002 | classroom 会话 |
 | 0003 | growth 成长档案 |
@@ -268,7 +305,32 @@ docker run -p 7860:7860 \
 | 0013 | class_region_detail |
 | 0014 | custom_avatar |
 
-应用启动时 `ensure_migrated()` 自动应用未执行的迁移。
+---
+
+## 🛠️ CI
+
+`.circleci/config.yml` 自动在每次推送时跑：
+- 后端：ruff / mypy / pytest
+- 前端：eslint / tsc typecheck / vitest / vite build
+
+---
+
+## 🐛 关键修复历史
+
+从 Gitee 合并 commit（`47f583c Merge branch 'feat-develop-web-folder-c1Z7mf' into master`）以来的重要修复：
+
+| Commit | 描述 |
+|--------|------|
+| `dbdcd1a` | **平台网关剥除 Authorization header → 改用 `X-Auth-Token`**，修复魔塔创空间 401 循环 |
+| `0f1a8ee` | **内存会话存储 `session_store.py`**，规避 OSS-FUSE 写后读不一致导致登录后查不到 token |
+| `0f1a8ee` | **SPA 前端单容器托管**，FastAPI 同时托管 Vite dist + API |
+| `0f1a8ee` | **agentscope 依赖纳入 Dockerfile**，先装 hatchling 再 `--no-build-isolation`，确保 voice_ws 可加载 |
+| `8b9c85a` | **防御性加载 voice_ws**（try/except），agentscope/mcp 版本不兼容时核心业务不受影响 |
+| `3a75645` | 教师登录不再强制输入班级码，支持姓名+密码直登 |
+| `a3773c2` | 班级码大小写适配，统一输入层 + API 层归一化大写 |
+| `cfbba2b` | 教师班级切换跳过重输班级码（presetClass via route state） |
+| `af20aad` | DemoModeToggle 教师端入口页面 |
+| `7571bbf` | 管理员登录 Demo 快速入口 + 右上角 toggle |
 
 ---
 
@@ -277,44 +339,45 @@ docker run -p 7860:7860 \
 ```bash
 # 后端
 cd server
-pytest tests/ -v              # 全量
-pytest tests/f2/test_voice_ws.py  # 语音专项
+pytest tests/ -v
 
 # 前端
 cd web-spa
-npm run test                  # vitest
-npm run typecheck             # tsc 类型检查
-npm run lint                  # ESLint
+npm run test          # vitest
+npm run typecheck     # tsc
+npm run lint          # ESLint
 ```
 
 ---
 
 ## 📚 相关文档
 
-- [F5 联调验收报告](./docs/acceptance.md)
-- [验收用例矩阵](./docs/acceptance_matrix.md)
-- [API 契约变更日志](./docs/api-changelog.md)
-- [演示谈心脚本](./docs/demo-script.md)
-- [彩排脚本](./docs/rehearsal.md)
-- [模型接入方案](./docs/模型接入方案.md)
+| 文档 | 位置 |
+|------|------|
+| F5 联调验收报告 | [docs/acceptance.md](docs/acceptance.md) |
+| 验收用例矩阵 | [docs/acceptance_matrix.md](docs/acceptance_matrix.md) |
+| API 契约变更日志 | [docs/api-changelog.md](docs/api-changelog.md) |
+| 演示谈心脚本 | [docs/demo-script.md](docs/demo-script.md) |
+| 彩排脚本 | [docs/rehearsal.md](docs/rehearsal.md) |
+| 模型接入方案 | [docs/模型接入方案.md](docs/模型接入方案.md) |
+| 展示视频交付 | [docs/showcase-video/delivery.md](docs/showcase-video/delivery.md) |
+| 展示视频分镜 | [docs/showcase-video/storyboard.md](docs/showcase-video/storyboard.md) |
+| 术语白话映射 | [docs/showcase-video/jargon-map.md](docs/showcase-video/jargon-map.md) |
 
 ---
 
-## ⚠️ 模型接入现状说明
+## ⚠️ 模型接入现状
 
-> 来源：[docs/模型接入方案.md](./docs/模型接入方案.md)
-
-当前项目中**唯一真正调用在线模型的是语音对话服务**（DashScope realtime）。书信生成、班宠画像、评分、备课均为**模板/规则实现**，不消耗模型额度：
+**当前唯一真正调用在线模型的是语音对话服务**（DashScope Realtime）。书信、备课、评分、班宠画像均为模板/规则实现，零模型依赖：
 
 | 组件 | 模型接入 |
 |------|---------|
 | 语音对话 | ✅ DashScope Realtime（OpenAI-realtime 兼容） |
-| 评分 / 宠物三态 / 结算 | ❌ 纯函数 / 规则（铁律禁 LLM） |
-| 书信 | ❌ 模板填槽 |
-| 备课 | ❌ 模板拼装 |
+| 评分 / 宠物三态 / 结算 | ❌ 纯函数/规则（铁律禁 LLM） |
+| 书信 / 备课 | ❌ 模板填槽 / 模板拼装 |
 | 班宠画像 | ❌ 占位（未实现） |
 
-在 `VOICE_PROVIDER=local` 模式下，**整个系统零模型依赖**，可完全离线演示。
+`VOICE_PROVIDER=local` 模式下**全系统零模型依赖**，可完全离线演示。
 
 ---
 
